@@ -1,0 +1,88 @@
+# MASH IoT Device Configuration
+# This file contains default configuration values
+# Environment variables will override these values
+
+# Device Configuration
+device:
+  id: "MASH-A1-CAL25-D5A91F"
+  name: "MASH Chamber #1"
+  type: "MASH_CHAMBER"
+  model: "RPi3-ModelB"
+  serial_number: ""
+  mac_address: ""
+
+# Backend Configuration
+backend:
+  api_url: "https://mash-backend.onrender.com/api"
+  api_key: ""
+  timeout: 30
+
+# MQTT Configuration
+mqtt:
+  broker_url: "mqtt://localhost:1883"
+  username: ""
+  password: ""
+  client_id: "mash_device_001"
+  keepalive: 60
+  qos: 1
+
+# Database Configuration
+database:
+  path: "./data/mash_device.db"
+  timeout: 30
+  backup_interval: 3600  # 1 hour
+
+# Sensor Configuration
+sensors:
+  scd41:
+    read_interval: 60  # seconds
+    calibration:
+      temperature_offset: 0.0
+      humidity_offset: 0.0
+    mock_mode: false
+
+# Control Thresholds
+control:
+  temperature:
+    min: 25.0
+    max: 28.0
+    critical_high: 32.0
+  humidity:
+    min: 80.0
+    max: 90.0
+  co2:
+    optimal_min: 10000
+    optimal_max: 15000
+    critical_high: 20000
+
+# Sync Configuration
+sync:
+  interval: 300  # seconds
+  batch_size: 100
+  retry_attempts: 3
+  retry_delay: 60  # seconds
+
+# Data Retention
+retention:
+  days: 30
+  cleanup_interval: 86400  # 24 hours
+
+# Alert Configuration
+alerts:
+  cooldown_seconds: 900  # 15 minutes
+  escalation_levels: 3
+  notification_methods: ["local", "mqtt"]
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "./logs/mash_device.log"
+  max_size: 10485760  # 10MB
+  backup_count: 5
+  structured: false
+
+# Development/Testing
+development:
+  mock_mode: false
+  debug_mode: false
+  test_sensors: false

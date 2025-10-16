@@ -1,0 +1,161 @@
+# ============================================================================
+# MASH Backend - Environment Configuration
+# ============================================================================
+# Environment variables for NestJS application with WebSocket support
+# Last Updated: October 8, 2025
+# 
+# SECURITY WARNING: Never commit this file to version control!
+# Keep sensitive credentials secure and rotate them regularly.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# DATABASE CONFIGURATION - Neon PostgreSQL
+# ----------------------------------------------------------------------------
+# Production-ready cloud PostgreSQL with connection pooling
+# Connection pooling enabled for optimal performance (4 pools x 9 connections)
+DATABASE_URL=""
+
+# ----------------------------------------------------------------------------
+# FIREBASE AUTHENTICATION & CLOUD MESSAGING
+# ----------------------------------------------------------------------------
+# For production: Use actual credentials
+# For local testing: Run Firebase emulator (FIREBASE_AUTH_EMULATOR_HOST)
+FIREBASE_PROJECT_ID=""
+FIREBASE_CLIENT_EMAIL=""
+FIREBASE_API_KEY=""
+FIREBASE_PRIVATE_KEY=""
+FIREBASE_DATABASE_URL=""
+FIREBASE_AUTH_EMULATOR_HOST="http://127.0.0.1:9099"
+
+# Firebase Cloud Messaging (FCM) - for push notifications
+FCM_SENDER_ID=""
+FCM_SERVICE_ACCOUNT_EMAIL=""
+FCM_PRIVATE_KEY_ID=""
+FCM_PRIVATE_KEY=""
+
+# ----------------------------------------------------------------------------
+# EMAIL CONFIGURATION - Gmail SMTP
+# ----------------------------------------------------------------------------
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=MASH.Mushroom.Automation@gmail.com
+EMAIL_PASSWORD=
+EMAIL_FROM=MASH Mushroom Automation <MASH.Mushroom.Automation@gmail.com>
+
+# ----------------------------------------------------------------------------
+# SENDGRID CONFIGURATION - Alternative Email Service
+# ----------------------------------------------------------------------------
+# Get free API key from https://sendgrid.com (100 emails/day free tier)
+SENDGRID_API_KEY=
+SENDGRID_FROM_EMAIL=MASH.Mushroom.Automation@gmail.com
+
+# ----------------------------------------------------------------------------
+# TWILIO CONFIGURATION - SMS Alerts
+# ----------------------------------------------------------------------------
+# Get trial account from https://twilio.com
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+
+# ----------------------------------------------------------------------------
+# REDIS CONFIGURATION - Upstash Cloud Redis
+# ----------------------------------------------------------------------------
+# Used for: BullMQ job queues, WebSocket adapter (horizontal scaling), caching
+REDIS_HOST=proven-aphid-10039.upstash.io
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_URL=""
+
+# Upstash Redis REST API (alternative access method)
+UPSTASH_REDIS_REST_URL="https://proven-aphid-10039.upstash.io"
+UPSTASH_REDIS_REST_TOKEN=""
+
+# ----------------------------------------------------------------------------
+# ALERT SYSTEM CONFIGURATION
+# ----------------------------------------------------------------------------
+ALERT_QUEUE_CONCURRENCY=10              # Parallel alert processing
+ALERT_MAX_RETRIES=3                     # Retry failed alerts 3 times
+ALERT_COOLDOWN_MINUTES=15               # Wait 15min before re-alerting
+ALERT_DEDUPLICATION_WINDOW_MINUTES=60   # Deduplicate within 60min window
+
+# ----------------------------------------------------------------------------
+# MQTT CONFIGURATION - IoT Device Communication
+# ----------------------------------------------------------------------------
+MQTT_ENABLED=false
+MQTT_BROKER_URL=mqtt://localhost:1883
+# MQTT_USERNAME=your-mqtt-username
+# MQTT_PASSWORD=your-mqtt-password
+
+# ----------------------------------------------------------------------------
+# JWT CONFIGURATION - JSON Web Token Authentication
+# ----------------------------------------------------------------------------
+# CRITICAL: Change this secret in production! Use a strong 256+ bit key
+# Used for: WebSocket authentication, REST API tokens, session management
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+# ----------------------------------------------------------------------------
+# CLERK CONFIGURATION - Enterprise Authentication (Optional)
+# ----------------------------------------------------------------------------
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SECRET=whsec_...     # Get from Clerk webhook settings
+CLERK_JWT_KEY=...                  # For JWT verification (optional)
+
+# ----------------------------------------------------------------------------
+# FRONTEND URLs - For redirects and CORS
+# ----------------------------------------------------------------------------
+FRONTEND_URL=http://localhost:3000
+CLERK_AFTER_SIGN_IN_URL=/dashboard
+CLERK_AFTER_SIGN_UP_URL=/onboarding
+
+# ----------------------------------------------------------------------------
+# SESSION CONFIGURATION
+# ----------------------------------------------------------------------------
+SESSION_DURATION=7d                # JWT token expiry: 7 days
+REFRESH_TOKEN_DURATION=30d         # Refresh token expiry: 30 days
+MAX_SESSIONS_PER_USER=5            # Max concurrent sessions per user
+
+# ============================================================================
+# WEBSOCKET CONFIGURATION - Real-time Communication (Issue #9)
+# ============================================================================
+# Enterprise-grade WebSocket implementation with Socket.IO
+# Status: ✅ Implemented (75% Complete - Week 1)
+# Last Updated: October 8, 2025
+# ----------------------------------------------------------------------------
+
+# Server Configuration
+WS_PORT=3000                                                                  # WebSocket server port (same as HTTP)
+WS_NAMESPACE=/ws                                                              # Socket.IO namespace for WebSocket connections
+
+# CORS Configuration (Allow multiple frontend origins)
+WS_CORS_ORIGIN=http://localhost:3000,http://localhost:4200,http://localhost:5173
+
+# Connection Health & Timeouts
+WS_PING_TIMEOUT=60000                                                         # 60 seconds - disconnect if no pong received
+WS_PING_INTERVAL=25000                                                        # 25 seconds - health check interval
+WS_MAX_CONNECTIONS=10000                                                      # Maximum concurrent connections
+
+# Feature Flags
+WS_REDIS_ADAPTER_ENABLED=false                                                # Enable Redis adapter for horizontal scaling (Week 4)
+WS_COMPRESSION_ENABLED=true                                                   # Enable WebSocket compression
+WS_TRANSPORTS=websocket,polling                                              # Allowed transport methods
+
+# ============================================================================
+# END OF CONFIGURATION
+# ============================================================================
+# 
+# Quick Reference:
+# - Database: Neon PostgreSQL (4 pools x 9 connections = 36 total)
+# - Redis: Upstash Cloud (For queues + future WebSocket scaling)
+# - WebSocket: Socket.IO on /ws namespace (JWT authenticated)
+# - Email: Gmail SMTP + SendGrid backup
+# - Auth: JWT + Firebase + Clerk (optional)
+# 
+# Testing WebSocket:
+# 1. Generate JWT at https://jwt.io/ using JWT_SECRET above
+# 2. Open: src/modules/websocket/test-client.html
+# 3. Connect with token to ws://localhost:3000/ws
+# 
+# Documentation: See documents/WebSocket_MASTER_INDEX.md for all guides
+# ============================================================================
