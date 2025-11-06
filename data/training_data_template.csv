@@ -1,0 +1,31 @@
+timestamp,co2,temperature,humidity,mode,exhaust_fan,intake_fan,humidifier,outcome,notes
+2024-01-01 10:00:00,12500,22.5,85.0,SPAWNING,0,0,1,success,Initial spawning phase
+2024-01-01 10:05:00,12800,22.8,86.5,SPAWNING,0,0,1,success,CO2 rising as expected
+2024-01-01 10:10:00,13200,23.0,87.0,SPAWNING,0,0,0,success,Stable conditions
+2024-01-01 10:15:00,13500,23.2,88.0,SPAWNING,0,0,0,success,Mycelium colonizing well
+2024-01-01 10:20:00,8500,23.5,85.0,SPAWNING,0,1,0,failure,CO2 dropped too low - poor colonization
+2024-01-01 10:25:00,9200,23.3,84.0,SPAWNING,0,0,0,failure,Recovering but damage done
+2024-01-02 08:00:00,650,20.5,90.0,FRUITING,0,0,1,success,Fruiting initiated
+2024-01-02 08:05:00,680,20.8,91.0,FRUITING,0,0,1,success,Pins forming
+2024-01-02 08:10:00,720,21.0,92.0,FRUITING,0,0,1,success,Good fruiting conditions
+2024-01-02 08:15:00,950,21.5,89.0,FRUITING,1,1,0,success,CO2 slightly high - venting
+2024-01-02 08:20:00,750,21.2,88.0,FRUITING,0,0,1,success,Back to optimal range
+2024-01-02 08:25:00,1200,22.0,85.0,FRUITING,1,1,0,failure,CO2 too high - mushrooms stressed
+2024-01-02 08:30:00,450,21.0,82.0,FRUITING,0,0,1,failure,CO2 too low - slow growth
+2024-01-03 09:00:00,11000,22.0,86.0,SPAWNING,0,0,1,success,Healthy mycelium growth
+2024-01-03 09:05:00,11500,22.2,87.0,SPAWNING,0,0,1,success,Optimal spawning
+2024-01-03 09:10:00,15000,23.5,88.0,SPAWNING,0,0,0,success,High CO2 acceptable for spawning
+2024-01-03 09:15:00,16000,24.0,89.0,SPAWNING,1,0,0,warning,CO2 very high - slight ventilation
+2024-01-04 10:00:00,620,19.5,91.0,FRUITING,0,0,1,success,Excellent fruiting
+2024-01-04 10:05:00,700,20.0,92.5,FRUITING,0,0,1,success,Mushrooms developing well
+2024-01-04 10:10:00,780,20.5,93.0,FRUITING,0,0,1,success,Near optimal
+2024-01-04 10:15:00,850,21.0,90.0,FRUITING,1,0,0,success,Minor adjustment needed
+2024-01-04 10:20:00,720,20.8,91.0,FRUITING,0,0,1,success,Stable fruiting conditions
+2024-01-05 11:00:00,13000,22.5,85.5,SPAWNING,0,0,1,success,Strong colonization
+2024-01-05 11:05:00,13500,22.8,86.0,SPAWNING,0,0,1,success,Mycelium spreading rapidly
+2024-01-05 11:10:00,7000,23.0,84.   0,SPAWNING,0,1,0,failure,Ventilation error - CO2 dropped
+2024-01-05 11:15:00,8500,22.8,83.5,SPAWNING,0,0,1,warning,Recovering from low CO2
+2024-01-06 08:30:00,680,20.2,91.5,FRUITING,0,0,1,success,Perfect fruiting start
+2024-01-06 08:35:00,710,20.5,92.0,FRUITING,0,0,1,success,Pins emerging
+2024-01-06 08:40:00,1100,21.5,88.0,FRUITING,1,1,0,warning,CO2 rising - exhaust activated
+2024-01-06 08:45:00,800,21.0,89.5,FRUITING,0,0,1,success,Corrected back to range

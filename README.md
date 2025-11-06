@@ -2,18 +2,54 @@
 
 **Mushroom Automation with Smart Hydro-environment using IoT and AI for Sustainable Harvest**
 
-A Raspberry Pi-based IoT controller for automated mushroom cultivation chamber management.
+A Raspberry Pi 3 Model B-based IoT controller for automated mushroom cultivation chamber management.
 
 ## Overview
 
 This project implements the IoT device component of the M.A.S.H. thesis project, providing:
 
-- **Real-time sensor monitoring** (Temperature, Humidity, CO₂)
-- **Automated environmental control** (Fans, Humidifiers)
-- **Offline-first data storage** with cloud synchronization
-- **MQTT communication** with backend services
-- **Local LCD display** for monitoring
-- **Alert system** for critical conditions
+- **WiFi Provisioning via Hotspot** - Easy setup without keyboard/monitor
+- **Real-time sensor monitoring** - CO₂, Temperature, Humidity via Arduino/SCD41
+- **Automated actuator control** - Fans, Humidifier, LED Lights via GPIO relays
+- **Local REST API** - Direct control from mobile app on same network
+- **Cloud connectivity** - Remote control via backend when on internet
+- **Offline-first data storage** - SQLite with backend synchronization
+- **Auto-boot service** - Runs automatically on power-up
+- **mDNS discovery** - Device findable on local network
+
+## Documentation
+
+- **[SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)** - Step-by-step setup guide
+- **[QUICKSTART.md](QUICKSTART.md)** - Fast 5-minute deployment for presentations
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete technical documentation
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What was built and how
+- **[SCHEMA_USAGE.md](SCHEMA_USAGE.md)** - Backend database integration details
+
+## Directory Structure
+
+```
+/home/mash/MASH-IoT-Device/
+├── main.py                     # Main application entry point
+├── install.sh                  # One-command installation script
+├── requirements.txt            # Python dependencies
+├── .env                        # Configuration (create from .env.example)
+├── config/
+│   ├── device_config.yaml      # Default configuration
+│   └── mash-device.service     # Systemd service for auto-boot
+├── src/
+│   ├── actuators/              # GPIO actuator control
+│   ├── api/                    # REST API server (Flask)
+│   ├── sensors/                # Sensor data collection
+│   ├── storage/                # SQLite local database
+│   ├── utils/                  # Network, hotspot, config
+│   └── backend_client.py       # Cloud API communication
+├── raspberry-pi/
+│   └── actuator_controller.py  # Standalone actuator script
+├── arduino-uno/                # Arduino sensor code
+├── logs/                       # Auto-generated logs
+├── data/                       # Local database files
+└── documents/                  # Schema and documentation
+```
 
 ## Hardware Requirements
 
@@ -31,49 +67,59 @@ This project implements the IoT device component of the M.A.S.H. thesis project,
 
 ## Quick Start
 
-### 1. Clone Repository
+### On Raspberry Pi
 
 ```bash
-git clone <repository-url>
-cd MASH-IoT-Device
-```
+# 1. SSH into your Raspberry Pi
+ssh mash@MASH-CHAMBER
 
-### 2. Install Dependencies
+# 2. Navigate to project directory
+cd ~/MASH-IoT-Device
 
-```bash
-# Install Python dependencies
-pip install -r requirements.txt
+# 3. Run installation script
+chmod +x install.sh
+./install.sh
 
-# For Raspberry Pi hardware support
-pip install RPi.GPIO adafruit-circuitpython-scd4x
-```
-
-### 3. Configure Device
-
-```bash
-# Copy environment template
-cp env.example .env
-
-# Edit configuration
+# 4. Create environment file
+cp .env.example .env
 nano .env
+
+# 5. Reboot to start service
+sudo reboot
 ```
 
-### 4. Initialize Database
+### After Reboot
+
+The device will automatically:
+1. Start the MASH service
+2. Check for WiFi connection
+3. Create hotspot `MASH-Chamber-XXXXXX` if not connected
+4. Wait for mobile app to configure WiFi
+
+### Test Manually
 
 ```bash
-# Create data directory
-mkdir -p data logs
+# Start service
+sudo systemctl start mash-device
 
-# Run application (will create database automatically)
-python main.py
+# Check status
+sudo systemctl status mash-device
+
+# View logs
+sudo journalctl -u mash-device -f
+
+# Test in mock mode (no hardware needed)
+python3 main.py --mock
 ```
 
-### 5. Test in Mock Mode
+### API Endpoints
 
-```bash
-# Run with mock sensors (for development)
-python main.py --mock --debug
-```
+When hotspot is active:
+- **Provisioning Info**: `http://192.168.4.1:5000/api/v1/provisioning/info`
+- **WiFi Scan**: `http://192.168.4.1:5000/api/v1/wifi/scan`
+- **WiFi Config**: `POST http://192.168.4.1:5000/api/v1/wifi/config`
+- **Device Status**: `http://192.168.4.1:5000/api/v1/status`
+- **Actuator Control**: `POST http://192.168.4.1:5000/api/v1/commands/actuator_control`
 
 ## Configuration
 

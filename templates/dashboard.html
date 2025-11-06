@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MASH IoT Device - Live Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        
+        .btn-spawning {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-spawning:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+        
+        .btn-fruiting {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-fruiting:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+        
+        .btn.active {
+            box-shadow: 0 0 20px rgba(255,255,255,0.5);
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .charts {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-container:last-child {
+            margin-bottom: 0;
+        }
+        
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .stats-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .stats-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            font-weight: 500;
+            color: #7f8c8d;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .alert {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .notifications {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .notification {
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        
+        .notification.alert {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .notification.warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .notification.success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .notification.info {
+            background: #3498db;
+            color: white;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background: #27ae60;
+            animation: blink 2s infinite;
+        }
+        
+        .status-offline {
+            background: #e74c3c;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍄 MASH IoT Device</h1>
+            <p>Mushroom Cultivation Monitoring Dashboard</p>
+        </div>
+        
+        <div class="controls">
+            <button id="btnSpawning" class="btn btn-spawning">Spawning Mode (CO2 > 10,000 ppm)</button>
+            <button id="btnFruiting" class="btn btn-fruiting">Fruiting Mode (CO2 500-800 ppm)</button>
+        </div>
+        
+        <div class="dashboard">
+            <div class="charts">
+                <div class="chart-container">
+                    <div class="chart-title">CO2 Levels (ppm)</div>
+                    <canvas id="co2Chart"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-title">Temperature (°C)</div>
+                    <canvas id="tempChart"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <div class="chart-title">Humidity (%)</div>
+                    <canvas id="humChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="stats-card">
+                    <h3>📊 Current Statistics</h3>
+                    <div id="currentStats">
+                        <div class="stat-item">
+                            <span class="stat-label">Status:</span>
+                            <span class="stat-value">
+                                <span class="status-indicator status-offline"></span>
+                                Connecting...
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stats-card">
+                    <h3>📈 Data Summary</h3>
+                    <div id="dataSummary">
+                        <div class="stat-item">
+                            <span class="stat-label">Samples:</span>
+                            <span class="stat-value" id="sampleCount">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Uptime:</span>
+                            <span class="stat-value" id="uptime">0s</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Mode:</span>
+                            <span class="stat-value" id="currentMode">Unknown</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stats-card">
+                    <h3>🔔 Notifications</h3>
+                    <div id="notifications" class="notifications">
+                        <div class="notification info">Waiting for data...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>MASH IoT Device - Live Mushroom Cultivation Monitoring</p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Chart.js configurations
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Time (seconds)'
+                    }
+                },
+                y: {
+                    display: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        };
+        
+        // Initialize charts
+        const co2Ctx = document.getElementById('co2Chart').getContext('2d');
+        const co2Chart = new Chart(co2Ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CO2 (ppm)',
+                    data: [],
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'CO2 (ppm)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        const tempCtx = document.getElementById('tempChart').getContext('2d');
+        const tempChart = new Chart(tempCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    data: [],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        const humCtx = document.getElementById('humChart').getContext('2d');
+        const humChart = new Chart(humCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Humidity (%)',
+                    data: [],
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                ...chartOptions,
+                scales: {
+                    ...chartOptions.scales,
+                    y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                            display: true,
+                            text: 'Humidity (%)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Update charts with new data
+        function updateCharts(data) {
+            // Update CO2 chart
+            co2Chart.data.labels = data.times.map(t => t.toFixed(1));
+            co2Chart.data.datasets[0].data = data.co2_values;
+            co2Chart.update('none');
+            
+            // Update temperature chart
+            tempChart.data.labels = data.times.map(t => t.toFixed(1));
+            tempChart.data.datasets[0].data = data.temp_values;
+            tempChart.update('none');
+            
+            // Update humidity chart
+            humChart.data.labels = data.times.map(t => t.toFixed(1));
+            humChart.data.datasets[0].data = data.hum_values;
+            humChart.update('none');
+        }
+        
+        // Update statistics display
+        function updateStats(data) {
+            const statsDiv = document.getElementById('currentStats');
+            const sampleCount = document.getElementById('sampleCount');
+            const uptime = document.getElementById('uptime');
+            const currentMode = document.getElementById('currentMode');
+            
+            // Update status indicator
+            const statusIndicator = statsDiv.querySelector('.status-indicator');
+            const statusText = statsDiv.querySelector('.stat-value');
+            
+            if (data.times.length > 0) {
+                statusIndicator.className = 'status-indicator status-online';
+                statusText.innerHTML = '<span class="status-indicator status-online"></span>Online';
+            } else {
+                statusIndicator.className = 'status-indicator status-offline';
+                statusText.innerHTML = '<span class="status-indicator status-offline"></span>No Data';
+            }
+            
+            // Update sample count
+            sampleCount.textContent = data.times.length;
+            
+            // Update uptime
+            const uptimeSeconds = Math.floor(data.uptime);
+            const hours = Math.floor(uptimeSeconds / 3600);
+            const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+            const seconds = uptimeSeconds % 60;
+            
+            if (hours > 0) {
+                uptime.textContent = `${hours}h ${minutes}m ${seconds}s`;
+            } else if (minutes > 0) {
+                uptime.textContent = `${minutes}m ${seconds}s`;
+            } else {
+                uptime.textContent = `${seconds}s`;
+            }
+            
+            // Update current mode
+            currentMode.textContent = data.current_mode;
+            
+            // Update mode buttons
+            document.getElementById('btnSpawning').classList.toggle('active', data.current_mode === 'SPAWNING');
+            document.getElementById('btnFruiting').classList.toggle('active', data.current_mode === 'FRUITING');
+        }
+        
+        // Update notifications
+        function updateNotifications(notifications) {
+            const notificationsDiv = document.getElementById('notifications');
+            notificationsDiv.innerHTML = '';
+            
+            if (notifications.length === 0) {
+                notificationsDiv.innerHTML = '<div class="notification info">No notifications</div>';
+                return;
+            }
+            
+            notifications.forEach(notif => {
+                const div = document.createElement('div');
+                div.className = `notification ${notif.type}`;
+                div.innerHTML = `<strong>[${notif.time}]</strong> ${notif.message}`;
+                notificationsDiv.appendChild(div);
+            });
+        }
+        
+        // Handle mode switching
+        document.getElementById('btnSpawning').addEventListener('click', () => {
+            fetch('/api/mode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: 'SPAWNING' })
+            });
+        });
+        
+        document.getElementById('btnFruiting').addEventListener('click', () => {
+            fetch('/api/mode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: 'FRUITING' })
+            });
+        });
+        
+        // Handle socket events
+        socket.on('connect', () => {
+            console.log('Connected to dashboard');
+        });
+        
+        socket.on('data_update', (data) => {
+            updateCharts(data);
+            updateStats(data);
+            updateNotifications(data.notifications);
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Disconnected from dashboard');
+        });
+        
+        // Initial data load
+        fetch('/api/data')
+            .then(response => response.json())
+            .then(data => {
+                updateCharts(data);
+                updateStats(data);
+                updateNotifications(data.notifications);
+            });
+    </script>
+</body>
+</html>

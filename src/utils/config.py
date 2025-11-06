@@ -69,6 +69,9 @@ class Config:
             'sensor_read_interval': int(os.getenv('SENSOR_READ_INTERVAL', '60')),
             'sensor_calibration_offset_temp': float(os.getenv('SENSOR_CALIBRATION_OFFSET_TEMP', '0.0')),
             'sensor_calibration_offset_humidity': float(os.getenv('SENSOR_CALIBRATION_OFFSET_HUMIDITY', '0.0')),
+            'sensors.source': os.getenv('SENSOR_SOURCE', 'arduino_bridge'),
+            'sensors.serial.port': os.getenv('SENSOR_SERIAL_PORT', '/dev/ttyACM0'),
+            'sensors.serial.baud': int(os.getenv('SENSOR_SERIAL_BAUD', '9600')),
             
             # Control Thresholds
             'temp_min': float(os.getenv('TEMP_MIN', '25.0')),

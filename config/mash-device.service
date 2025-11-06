@@ -1,0 +1,30 @@
+[Unit]
+Description=MASH IoT Device Service
+Documentation=https://github.com/your-org/mash-iot-device
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=mash
+Group=mash
+WorkingDirectory=/home/mash/MASH-IoT-Device
+Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=/home/mash/MASH-IoT-Device/.env
+ExecStartPre=/bin/sleep 10
+ExecStart=/usr/bin/python3 /home/mash/MASH-IoT-Device/main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/mash/MASH-IoT-Device/logs/service.log
+StandardError=append:/home/mash/MASH-IoT-Device/logs/service-error.log
+
+# Security settings
+NoNewPrivileges=false
+PrivateTmp=false
+
+# Allow GPIO access
+SupplementaryGroups=gpio i2c spi
+
+[Install]
+WantedBy=multi-user.target

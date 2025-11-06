@@ -37,6 +37,10 @@ psutil>=5.9.0
 # Web server for local API
 flask>=2.0.0
 flask-restful>=0.3.9
+flask-cors>=3.0.10
+
+# Serial communication with Arduino
+pyserial>=3.5
 
 # mDNS for local discovery
 zeroconf>=0.38.0

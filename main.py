@@ -23,6 +23,12 @@ from utils.logger import setup_logging
 from mqtt import MQTTClient
 from api import APIServer
 from discovery import MDNSService
+from utils.network_manager import NetworkManager
+from utils.provisioning_manager import ProvisioningManager
+from utils.hotspot_manager import HotspotManager
+from arduino_scd41_bridge import ArduinoSCD41Bridge
+from backend_client import BackendClient
+from actuators import ActuatorManager
 
 
 class MASHDevice:
@@ -44,9 +50,15 @@ class MASHDevice:
         # Initialize components
         self.database = None
         self.sensor_manager = None
+        self.arduino_bridge = None
         self.mqtt_client = None
         self.api_server = None
         self.mdns_service = None
+        self.network_manager = None
+        self.provisioning_manager = None
+        self.hotspot_manager = None
+        self.backend_client = None
+        self.actuator_manager = None
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -66,34 +78,49 @@ class MASHDevice:
             self._ensure_directories()
             
             # Get device ID
-            device_id = self.config.get('device.id', 'mash-device-001')
-            mock_mode = self.config.get('development.mock_mode', False)
+            device_id = self.config.get('device_id', self.config.get('device.id', 'mash-device-001'))
+            mock_mode = self.config.get('mock_mode', self.config.get('development.mock_mode', False))
+            provisioning_mode = self.config.get('provisioning_mode', self.config.get('provisioning.mode', False))
             
             # Initialize database
             self.database = DatabaseManager(
-                db_path=self.config.get('database.path', './data/mash_device.db'),
-                timeout=self.config.get('database.timeout', 30)
+                db_path=self.config.get('database_path', self.config.get('database.path', './data/mash_device.db')),
+                timeout=self.config.get('sqlite_timeout', self.config.get('database.timeout', 30))
             )
             
-            # Initialize sensor manager
-            self.sensor_manager = SensorManager(
-                read_interval=self.config.get('sensors.scd41.read_interval', 60),
-                mock_mode=mock_mode,
-                calibration_offsets={
-                    'temp': self.config.get('sensors.scd41.calibration.temperature_offset', 0.0),
-                    'humidity': self.config.get('sensors.scd41.calibration.humidity_offset', 0.0)
-                },
-                data_callback=self._on_sensor_reading
-            )
+            sensor_source = self.config.get('sensors.source', 'arduino_bridge')
+
+            if sensor_source == 'arduino_bridge' and not mock_mode:
+                self.logger.info("Using Arduino SCD41 bridge for sensor data")
+                serial_port = self.config.get('sensors.serial.port', self.config.get('sensors.serial_port', '/dev/ttyACM0'))
+                serial_baud = self.config.get('sensors.serial.baud', self.config.get('sensors.serial_baud', 9600))
+                self.arduino_bridge = ArduinoSCD41Bridge(
+                    serial_port=serial_port,
+                    baud_rate=serial_baud,
+                    data_callback=self._on_sensor_reading,
+                    log_level=logging.DEBUG if self.config.get('debug_mode', False) else logging.INFO
+                )
+                self.sensor_manager = None
+            else:
+                self.logger.info("Using onboard SCD41 sensor manager")
+                self.sensor_manager = SensorManager(
+                    read_interval=self.config.get('sensor_read_interval', self.config.get('sensors.scd41.read_interval', 60)),
+                    mock_mode=mock_mode,
+                    calibration_offsets={
+                        'temp': self.config.get('sensor_calibration_offset_temp', self.config.get('sensors.scd41.calibration.temperature_offset', 0.0)),
+                        'humidity': self.config.get('sensor_calibration_offset_humidity', self.config.get('sensors.scd41.calibration.humidity_offset', 0.0))
+                    },
+                    data_callback=self._on_sensor_reading
+                )
             
             # Initialize MQTT client
             self.mqtt_client = MQTTClient(
-                broker_url=self.config.get('mqtt.broker_url', 'mqtt://localhost:1883'),
-                client_id=self.config.get('mqtt.client_id', device_id),
-                username=self.config.get('mqtt.username', ''),
-                password=self.config.get('mqtt.password', ''),
-                keepalive=self.config.get('mqtt.keepalive', 60),
-                qos=self.config.get('mqtt.qos', 1),
+                broker_url=self.config.get('mqtt_broker_url', self.config.get('mqtt.broker_url', 'mqtt://localhost:1883')),
+                client_id=self.config.get('mqtt_client_id', device_id),
+                username=self.config.get('mqtt_username', self.config.get('mqtt.username', '')),
+                password=self.config.get('mqtt_password', self.config.get('mqtt.password', '')),
+                keepalive=self.config.get('mqtt_keepalive', self.config.get('mqtt.keepalive', 60)),
+                qos=self.config.get('mqtt_qos', self.config.get('mqtt.qos', 1)),
                 mock_mode=mock_mode
             )
             
@@ -105,7 +132,7 @@ class MASHDevice:
             self.api_server = APIServer(
                 host='0.0.0.0',
                 port=5000,
-                debug=self.config.get('development.debug_mode', False),
+                debug=self.config.get('debug_mode', self.config.get('development.debug_mode', False)),
                 mock_mode=mock_mode
             )
             
@@ -113,14 +140,62 @@ class MASHDevice:
             self.api_server.register_sensor_data_callback(self._get_latest_sensor_data)
             self.api_server.register_device_status_callback(self.get_status)
             self.api_server.register_command_handler('sensor_config', self._handle_sensor_config_command)
+            self.api_server.register_command_handler('actuator_control', self._handle_actuator_command)
+            self.api_server.register_wifi_scan_callback(self._wifi_scan)
+            self.api_server.register_wifi_connect_callback(self._wifi_connect)
+            self.api_server.register_provisioning_info_callback(self._get_provisioning_info)
+            
+            # Initialize network manager
+            self.network_manager = NetworkManager(
+                interface='wlan0',
+                mock_mode=mock_mode
+            )
+            
+            # Initialize hotspot manager for provisioning
+            self.hotspot_manager = HotspotManager(
+                device_id=device_id,
+                interface='wlan0',
+                ssid_prefix='MASH-Chamber',
+                password=None,  # Open network for easy setup
+                ap_ip='192.168.4.1',
+                mock_mode=mock_mode
+            )
+            
+            # Initialize backend client
+            backend_url = self.config.get('backend.api_url', 'https://mash-backend.onrender.com/api')
+            self.backend_client = BackendClient(
+                api_url=backend_url,
+                device_id=device_id,
+                api_key=self.config.get('backend.api_key'),
+                timeout=self.config.get('backend.timeout', 30),
+                mock_mode=mock_mode
+            )
+            
+            # Initialize actuator manager
+            self.actuator_manager = ActuatorManager(mock_mode=mock_mode)
             
             # Initialize mDNS service
             self.mdns_service = MDNSService(
                 device_id=device_id,
-                service_name=self.config.get('device.name', 'MASH IoT Device'),
+                service_name=self.config.get('device_name', self.config.get('device.name', 'MASH IoT Device')),
                 port=5000,
                 mock_mode=mock_mode
             )
+            
+            # Check network connectivity and start provisioning if needed
+            if not self.network_manager.is_connected():
+                self.logger.info("[WARN] Device not connected to WiFi")
+                self.logger.info("Starting provisioning mode (hotspot)")
+                if self.hotspot_manager.start():
+                    self.logger.info("Provisioning hotspot active")
+                    self.logger.info(f"Connect to WiFi: {self.hotspot_manager.ssid}")
+                    self.logger.info(f"Access setup at: http://{self.hotspot_manager.ap_ip}:5000")
+                else:
+                    self.logger.error("Failed to start provisioning hotspot")
+            else:
+                self.logger.info("Device connected to WiFi")
+                # Try to register with backend
+                self._try_backend_registration()
             
             self.logger.info("Device initialization completed")
             return True
@@ -158,10 +233,15 @@ class MASHDevice:
         try:
             self.logger.info("Starting MASH IoT Device...")
             
-            # Start sensor manager
-            if not self.sensor_manager.start():
-                self.logger.error("Failed to start sensor manager")
-                return False
+            # Start sensor pipeline
+            if self.sensor_manager:
+                if not self.sensor_manager.start():
+                    self.logger.error("Failed to start sensor manager")
+                    return False
+            if self.arduino_bridge:
+                if not self.arduino_bridge.start():
+                    self.logger.error("Failed to start Arduino bridge")
+                    return False
             
             # Start MQTT client
             if self.mqtt_client:
@@ -175,8 +255,8 @@ class MASHDevice:
                     self.logger.warning("Failed to start API server")
                     # Continue anyway - API is not critical
             
-            # Start mDNS service
-            if self.mdns_service:
+            # Start mDNS service (only if not in provisioning mode)
+            if self.mdns_service and not self.provisioning_manager.is_provisioning:
                 if not self.mdns_service.start():
                     self.logger.warning("Failed to start mDNS service")
                     # Continue anyway - mDNS is not critical
@@ -211,9 +291,12 @@ class MASHDevice:
         self.logger.info("Stopping MASH IoT Device...")
         self.running = False
         
-        # Stop sensor manager
+        # Stop sensor manager or bridge
         if self.sensor_manager:
             self.sensor_manager.stop()
+        if self.arduino_bridge:
+            self.arduino_bridge.stop()
+            self.arduino_bridge = None
         
         # Stop MQTT client
         if self.mqtt_client:
@@ -227,6 +310,18 @@ class MASHDevice:
         if self.mdns_service:
             self.mdns_service.stop()
         
+        # Stop hotspot
+        if self.hotspot_manager:
+            self.hotspot_manager.stop()
+        
+        # Stop actuators
+        if self.actuator_manager:
+            self.actuator_manager.cleanup()
+        
+        # Close backend connection
+        if self.backend_client:
+            self.backend_client.close()
+        
         self.logger.info("MASH IoT Device stopped")
     
     def _on_sensor_reading(self, reading: SensorReading):
@@ -239,9 +334,9 @@ class MASHDevice:
         try:
             # Store reading in database
             reading_data = reading.to_dict()
-            reading_data['device_id'] = self.config.get('device.id', 'default_device')
-            reading_data['sensor_type'] = 'temperature'  # Default sensor type
-            reading_data['unit'] = 'celsius'  # Default unit
+            reading_data['device_id'] = self.config.get('device_id', 'default_device')
+            reading_data['sensor_type'] = 'environment'  # Combined environmental reading
+            reading_data['unit'] = 'mixed'
             
             if self.database.store_sensor_reading(reading_data):
                 self.logger.debug(f"Stored sensor reading: {reading}")
@@ -262,8 +357,18 @@ class MASHDevice:
         Returns:
             Dictionary with latest sensor readings
         """
-        if self.sensor_manager:
-            return self.sensor_manager.get_latest_readings()
+        if self.sensor_manager and hasattr(self.sensor_manager, 'get_latest_reading'):
+            latest = self.sensor_manager.get_latest_reading()
+            if latest:
+                reading = latest.to_dict()
+                reading['source'] = 'sensor_manager'
+                return reading
+        if self.arduino_bridge:
+            latest = self.arduino_bridge.get_latest_reading()
+            if latest:
+                reading = latest.to_dict()
+                reading['source'] = 'arduino_bridge'
+                return reading
         return {}
     
     def _handle_sensor_config_command(self, command_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -283,6 +388,7 @@ class MASHDevice:
                     self.sensor_manager.set_read_interval(new_interval)
                     self.logger.info(f"Updated sensor read interval to {new_interval} seconds")
                     return {"success": True, "new_interval": new_interval}
+                return {"success": False, "error": "Sensor manager not available for interval updates"}
             
             return {"success": False, "error": "Invalid command data"}
         except Exception as e:
@@ -344,14 +450,17 @@ class MASHDevice:
             'running': self.running,
             'timestamp': datetime.now().isoformat(),
             'config': {
-                'device_id': self.config.get('device.id'),
-                'mock_mode': self.config.get('development.mock_mode', False),
-                'sensor_interval': self.config.get('sensors.scd41.read_interval', 60)
+                'device_id': self.config.get('device_id'),
+                'mock_mode': self.config.get('mock_mode', False),
+                'sensor_interval': self.config.get('sensor_read_interval', 60),
+                'sensor_source': self.config.get('sensors.source', 'arduino_bridge')
             }
         }
         
         if self.sensor_manager:
             status['sensor_manager'] = self.sensor_manager.get_statistics()
+        if self.arduino_bridge:
+            status['arduino_bridge'] = self.arduino_bridge.get_statistics()
         
         if self.database:
             status['database'] = self.database.get_database_stats()
@@ -362,7 +471,172 @@ class MASHDevice:
         if self.api_server:
             status['api'] = {'running': getattr(self.api_server, 'running', False)}
         
+        if self.network_manager:
+            status['network'] = {
+                'connected': self.network_manager.is_connected(),
+                'connection': self.network_manager.get_current_connection()
+            }
+        
+        if self.provisioning_manager:
+            status['provisioning'] = self.provisioning_manager.get_provisioning_info()
+        
         return status
+    
+    def _wifi_scan(self):
+        """WiFi scan callback for API server"""
+        if self.network_manager:
+            return self.network_manager.scan_wifi_networks()
+        return []
+    
+    def _wifi_connect(self, ssid: str, password: str) -> bool:
+        """WiFi connect callback for API server"""
+        if self.network_manager and self.hotspot_manager:
+            self.logger.info(f"Attempting to connect to WiFi: {ssid}")
+            
+            # First, stop the hotspot
+            self.logger.info("Stopping hotspot...")
+            self.hotspot_manager.stop()
+            
+            # Wait a moment for network interface to stabilize
+            import time
+            time.sleep(2)
+            
+            # Try to connect to WiFi
+            success = self.network_manager.connect_to_wifi(ssid, password)
+            
+            if success:
+                self.logger.info("WiFi connected successfully")
+                
+                # Wait for network to fully establish
+                time.sleep(3)
+                
+                # Start mDNS service
+                if self.mdns_service and not self.mdns_service.running:
+                    self.mdns_service.start()
+                
+                # Register device with backend
+                self._try_backend_registration()
+                
+                return True
+            else:
+                self.logger.error("WiFi connection failed")
+                self.logger.info("Restarting hotspot...")
+                
+                # Restart hotspot if connection failed
+                time.sleep(2)
+                self.hotspot_manager.start()
+                
+                return False
+        
+        return False
+    
+    def _get_provisioning_info(self) -> Dict[str, Any]:
+        """Get provisioning info callback for API server"""
+        info = {}
+        
+        if self.hotspot_manager:
+            info.update(self.hotspot_manager.get_status())
+        
+        if self.network_manager:
+            info['network_connected'] = self.network_manager.is_connected()
+            info['current_connection'] = self.network_manager.get_current_connection()
+        
+        if self.backend_client:
+            info['backend_registered'] = self.backend_client.is_registered
+            info['backend_url'] = self.backend_client.api_url
+        
+        return info
+    
+    def _try_backend_registration(self):
+        """Try to register device with backend"""
+        if not self.backend_client:
+            return
+        
+        try:
+            # Check if backend is reachable
+            if not self.backend_client.check_connection():
+                self.logger.warning("Backend not reachable, skipping registration")
+                return
+            
+            # Get device info
+            device_info = {
+                'name': self.config.get('device.name', 'MASH Chamber'),
+                'type': self.config.get('device.type', 'MUSHROOM_CHAMBER'),
+                'firmware': '1.0.0',
+                'location': 'Unknown',
+                'ip_address': self.network_manager.get_interface_ip() if self.network_manager else None
+            }
+            
+            # For now, use a default user ID (this should come from mobile app during provisioning)
+            # TODO: Get actual user_id from provisioning flow
+            user_id = self.config.get('device.owner_user_id', 'default-user')
+            
+            self.logger.info("Attempting to register with backend...")
+            if self.backend_client.register_device(user_id, device_info):
+                self.logger.info("Device registered with backend")
+            else:
+                self.logger.warning("Failed to register with backend")
+                
+        except Exception as e:
+            self.logger.error(f"Error during backend registration: {e}")
+    
+    def _handle_actuator_command(self, command_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle actuator control commands"""
+        if not self.actuator_manager:
+            return {"success": False, "error": "Actuator manager not available"}
+        
+        try:
+            action = command_data.get('action')
+            
+            if action == 'set':
+                # Set individual or multiple actuators
+                exhaust_fan = command_data.get('exhaust_fan')
+                intake_fan = command_data.get('intake_fan')
+                humidifier = command_data.get('humidifier')
+                led_lights = command_data.get('led_lights')
+                
+                success = self.actuator_manager.set_all(
+                    exhaust_fan=exhaust_fan,
+                    intake_fan=intake_fan,
+                    humidifier=humidifier,
+                    led_lights=led_lights
+                )
+                
+                if success:
+                    return {
+                        "success": True,
+                        "state": self.actuator_manager.get_state_dict()
+                    }
+                else:
+                    return {"success": False, "error": "Failed to set actuators"}
+            
+            elif action == 'get_state':
+                return {
+                    "success": True,
+                    "state": self.actuator_manager.get_state_dict()
+                }
+            
+            elif action == 'all_off':
+                success = self.actuator_manager.turn_all_off()
+                return {
+                    "success": success,
+                    "state": self.actuator_manager.get_state_dict()
+                }
+            
+            elif action == 'set_mode':
+                mode = command_data.get('mode', 'MANUAL')
+                success = self.actuator_manager.set_mode(mode)
+                return {
+                    "success": success,
+                    "mode": mode
+                }
+            
+            else:
+                return {"success": False, "error": f"Unknown action: {action}"}
+                
+        except Exception as e:
+            self.logger.error(f"Error handling actuator command: {e}")
+            return {"success": False, "error": str(e)}
 
 
 def main():
@@ -394,6 +668,7 @@ def main():
         # Set provisioning mode if specified
         if args.provision:
             device.config.set('provisioning_mode', True)
+            logger.info("Provisioning mode enabled")
         
         # Initialize device
         if not device.initialize():

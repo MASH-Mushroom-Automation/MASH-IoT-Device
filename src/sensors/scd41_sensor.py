@@ -73,7 +73,17 @@ class SCD41Sensor:
                 return True
             
             # Initialize I2C bus
-            i2c = busio.I2C(board.SCL, board.SDA)
+            # For I2C1 bus (pins 27, 28) - use board.SCL1 and board.SDA1
+            # For I2C0 bus (pins 3, 5) - use board.SCL and board.SDA
+            try:
+                # Try I2C1 first (pins 27, 28)
+                i2c = busio.I2C(board.SCL1, board.SDA1)
+                self.logger.info("Using I2C1 bus (pins 27, 28)")
+            except AttributeError:
+                # Fallback to I2C0 (pins 3, 5)
+                i2c = busio.I2C(board.SCL, board.SDA)
+                self.logger.info("Using I2C0 bus (pins 3, 5)")
+            
             self.sensor = SCD4X(i2c)
             
             # Start periodic measurement

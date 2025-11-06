@@ -220,10 +220,58 @@ GND     [39] [40] GPIO21
 ### SCD41 Sensor Connection (I2C)
 
 1. **Connect SCD41 to Raspberry Pi**
-   - VCC to 3.3V (Pin 1)
-   - GND to GND (Pin 9)
-   - SCL to GPIO3/SCL (Pin 5)
-   - SDA to GPIO2/SDA (Pin 3)
+   - VCC to 5V (Pin 2 or Pin 4)
+   - GND to GND (Pin 6, 9, 14, 20, 25, 30, 34, or 39)
+   - SCL to GPIO3/SCL (Pin 5) - **Note: If Pin 5 is occupied by touch screen, use alternative I2C pins**
+   - SDA to GPIO2/SDA (Pin 3) - **Note: If Pin 3 is occupied by touch screen, use alternative I2C pins**
+
+   **Alternative I2C Pins (if touch screen is using pins 3, 5):**
+   - **Option 1: Use I2C1 bus (Recommended)**
+     - SCL: GPIO1 (Pin 28) - ID_SC
+     - SDA: GPIO0 (Pin 27) - ID_SD
+   - **Option 2: Use Software I2C on any GPIO pins**
+     - SCL: GPIO11 (Pin 23) or GPIO13 (Pin 33)
+     - SDA: GPIO10 (Pin 19) or GPIO12 (Pin 32)
+
+2. **Check Available Pins**
+   ```bash
+   # Check which GPIO pins are in use
+   gpio readall
+   
+   # Check I2C devices
+   sudo i2cdetect -y 0  # Check I2C bus 0
+   sudo i2cdetect -y 1  # Check I2C bus 1
+   ```
+
+3. **Configure Alternative I2C Bus (if needed)**
+   ```bash
+   # Edit boot configuration
+   sudo nano /boot/config.txt
+   
+   # For I2C1 bus (Pins 27, 28) - Add this line:
+   dtparam=i2c_vc=on
+   
+   # For Software I2C on any GPIO pins - Add this line:
+   # dtoverlay=i2c-gpio,i2c_gpio_sda=10,i2c_gpio_scl=11
+   # (Replace 10,11 with your chosen GPIO pins)
+   
+   # Reboot after making changes
+   sudo reboot
+   ```
+
+4. **For Your Specific Setup (Pins 3,4,5,6 occupied):**
+   ```bash
+   # Connect SCD41 to:
+   # VCC: Pin 2 (5V) - NOT Pin 4 (which is occupied)
+   # GND: Pin 9, 14, 20, 25, 30, 34, or 39
+   # SCL: Pin 28 (GPIO1) - ID_SC
+   # SDA: Pin 27 (GPIO0) - ID_SD
+   
+   # Enable I2C1 in boot config
+   sudo nano /boot/config.txt
+   # Add: dtparam=i2c_vc=on
+   sudo reboot
+   ```
 
 ## Software Installation
 
@@ -241,10 +289,67 @@ GND     [39] [40] GPIO21
 3. **Set Up Project Files**
 
    **Option A: Transfer Files via SCP (Recommended)**
+   
+   **Step 1: Find Raspberry Pi IP Address**
    ```bash
-   # From your local machine, transfer the project files
-   scp -r /path/to/your/MASH-IoT-Device MASH@192.168.1.50:~/MASH-IoT-Device/
+   # On your Raspberry Pi, check the IP address
+   ip addr show wlan0 | grep "inet " | awk '{print $2}' | cut -d/ -f1
+   
+   # Alternative method
+   hostname -I
+   
+   # Or check all network interfaces
+   ip addr show
    ```
+   
+   **Step 2: Prepare your local machine**
+   ```bash
+   # Navigate to your project directory on Windows
+   cd C:\Users\Ryzen\Desktop\ThesisDev\MASH-IoT-Device
+   
+   # Verify you're in the right directory
+   dir
+   # You should see: main.py, requirements.txt, src/, config/, etc.
+   ```
+   
+   **Step 3: Create target directory on Raspberry Pi**
+   ```bash
+   # On your Raspberry Pi (via SSH or VS Code Remote)
+   mkdir -p ~/MASH-IoT-Device
+   ```
+   
+   **Step 4: Transfer files using SCP**
+   ```bash
+   # From your local Windows machine (PowerShell or Command Prompt)
+   scp -r . mash@192.168.1.50:~/MASH-IoT-Device/
+   
+   # If you get host key verification error, first run:
+   ssh-keygen -R 192.168.1.50
+   # Then try the scp command again
+   ```
+   
+   **Step 5: Verify transfer on Raspberry Pi**
+   ```bash
+   # On your Raspberry Pi
+   cd ~/MASH-IoT-Device
+   ls -la
+   # You should see: main.py, requirements.txt, src/, config/, etc.
+   ```
+   
+   **Step 6: Set up Python environment**
+   ```bash
+   # On your Raspberry Pi
+   cd ~/MASH-IoT-Device
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+   
+   **Troubleshooting SCP Issues:**
+   - **Host key verification failed**: Run `ssh-keygen -R 192.168.1.50` first
+   - **Permission denied**: Make sure you're using the correct username (mash)
+   - **Connection refused**: Check if SSH is enabled on the Pi
+   - **No such file or directory**: Create the target directory first with `mkdir -p ~/MASH-IoT-Device`
 
    **Option B: Use Git with Authentication**
    ```bash
@@ -253,7 +358,7 @@ GND     [39] [40] GPIO21
    git config --global user.email "your.email@example.com"
    
    # Clone with authentication
-   git clone https://github.com/yourusername/MASH-IoT-Device.git
+   git clone https://github.com/MASH-Mushroom-Automation/MASH-IoT-Device.git
    cd MASH-IoT-Device
    ```
 
