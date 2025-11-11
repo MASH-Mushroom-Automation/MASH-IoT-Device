@@ -7,13 +7,13 @@ device:
   id: "MASH-A1-CAL25-D5A91F"
   name: "MASH Chamber #1"
   type: "MASH_CHAMBER"
-  model: "RPi3-ModelB"
-  serial_number: ""
+  model: "AlphaPrototype"
+  serial_number: "D5A91F"
   mac_address: ""
 
 # Backend Configuration
 backend:
-  api_url: "https://mash-backend-api-production.up.railway.app/api"
+  api_url: "https://mash-backend-api-production.up.railway.app/api/v1/"
   api_key: ""
   timeout: 30
 
@@ -40,6 +40,10 @@ sensors:
       temperature_offset: 0.0
       humidity_offset: 0.0
     mock_mode: false
+  serial:
+    port: "/dev/ttyACM0"
+    baud_rate: 9600
+    timeout: 1
 
 # Control Thresholds
 control:
@@ -81,8 +85,38 @@ logging:
   backup_count: 5
   structured: false
 
+# Bluetooth Configuration
+bluetooth:
+  enabled: true
+  discoverable_on_startup: true
+  discoverable_timeout: 300  # 5 minutes
+  device_name: "MASH-IoT-Device"
+  pairing_required: true
+  tethering:
+    enabled: true
+    auto_start: false
+    interface: "bnep0"
+
+# GPIO Configuration (Raspberry Pi)
+gpio:
+  mode: "BCM"  # BCM or BOARD
+  relays:
+    blower_fan: 22
+    exhaust_fan: 27
+    humidifier: 17
+    led_lights: 18
+  active_low: true  # Relays are active LOW
+
+# API Server Configuration
+api:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  cors_enabled: true
+
 # Development/Testing
 development:
   mock_mode: false
   debug_mode: false
   test_sensors: false
+  simulation_mode: false  # Run without GPIO/Bluetooth

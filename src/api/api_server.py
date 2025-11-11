@@ -80,6 +80,9 @@ class APIServer:
         self.wifi_scan_callback = None
         self.wifi_connect_callback = None
         self.provisioning_info_callback = None
+        self.bluetooth_status_callback = None
+        self.bluetooth_start_tethering_callback = None
+        self.bluetooth_stop_tethering_callback = None
         
         # Initialize server
         self._initialize_server()
@@ -251,6 +254,54 @@ class APIServer:
                     logger.error(f"Error in provisioning info endpoint: {e}")
                     return jsonify({"error": str(e)}), 500
         
+        # Bluetooth endpoints
+        bluetooth_status_callback = self.bluetooth_status_callback
+        bluetooth_start_tethering_callback = self.bluetooth_start_tethering_callback
+        bluetooth_stop_tethering_callback = self.bluetooth_stop_tethering_callback
+        
+        class BluetoothStatusResource(Resource):
+            def get(self):
+                try:
+                    if bluetooth_status_callback:
+                        status = bluetooth_status_callback()
+                        return jsonify({
+                            "success": True,
+                            "data": status,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    return jsonify({"error": "Bluetooth not available"}), 503
+                except Exception as e:
+                    logger.error(f"Error in Bluetooth status endpoint: {e}")
+                    return jsonify({"error": str(e)}), 500
+        
+        class BluetoothTetheringResource(Resource):
+            def post(self):
+                try:
+                    data = request.json or {}
+                    action = data.get('action', 'start')
+                    
+                    if action == 'start':
+                        if bluetooth_start_tethering_callback:
+                            success = bluetooth_start_tethering_callback()
+                            return jsonify({
+                                "success": success,
+                                "message": "Bluetooth tethering started" if success else "Failed to start",
+                                "timestamp": datetime.now().isoformat()
+                            })
+                    elif action == 'stop':
+                        if bluetooth_stop_tethering_callback:
+                            success = bluetooth_stop_tethering_callback()
+                            return jsonify({
+                                "success": success,
+                                "message": "Bluetooth tethering stopped" if success else "Failed to stop",
+                                "timestamp": datetime.now().isoformat()
+                            })
+                    
+                    return jsonify({"error": "Invalid action"}), 400
+                except Exception as e:
+                    logger.error(f"Error in Bluetooth tethering endpoint: {e}")
+                    return jsonify({"error": str(e)}), 500
+        
         # Register resources
         self.api.add_resource(SensorDataResource, '/api/v1/sensors/latest')
         self.api.add_resource(DeviceStatusResource, '/api/v1/status')
@@ -260,6 +311,10 @@ class APIServer:
         self.api.add_resource(WiFiScanResource, '/api/v1/wifi/scan')
         self.api.add_resource(WiFiConfigResource, '/api/v1/wifi/config')
         self.api.add_resource(ProvisioningInfoResource, '/api/v1/provisioning/info')
+        
+        # Bluetooth endpoints
+        self.api.add_resource(BluetoothStatusResource, '/api/v1/bluetooth/status')
+        self.api.add_resource(BluetoothTetheringResource, '/api/v1/bluetooth/tethering')
     
     
     def start(self) -> bool:
@@ -379,3 +434,33 @@ class APIServer:
         """
         self.provisioning_info_callback = callback
         self.logger.debug("Registered provisioning info callback")
+    
+    def register_bluetooth_status_callback(self, callback: Callable[[], Dict[str, Any]]):
+        """
+        Register Bluetooth status callback
+        
+        Args:
+            callback: Callback function to get Bluetooth status
+        """
+        self.bluetooth_status_callback = callback
+        self.logger.debug("Registered Bluetooth status callback")
+    
+    def register_bluetooth_start_tethering_callback(self, callback: Callable[[], bool]):
+        """
+        Register Bluetooth start tethering callback
+        
+        Args:
+            callback: Callback function to start Bluetooth tethering
+        """
+        self.bluetooth_start_tethering_callback = callback
+        self.logger.debug("Registered Bluetooth start tethering callback")
+    
+    def register_bluetooth_stop_tethering_callback(self, callback: Callable[[], bool]):
+        """
+        Register Bluetooth stop tethering callback
+        
+        Args:
+            callback: Callback function to stop Bluetooth tethering
+        """
+        self.bluetooth_stop_tethering_callback = callback
+        self.logger.debug("Registered Bluetooth stop tethering callback")

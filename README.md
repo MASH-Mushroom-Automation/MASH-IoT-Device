@@ -11,11 +11,14 @@ This project implements the IoT device component of the M.A.S.H. thesis project,
 - **WiFi Provisioning via Hotspot** - Easy setup without keyboard/monitor
 - **Real-time sensor monitoring** - CO₂, Temperature, Humidity via Arduino/SCD41
 - **Automated actuator control** - Fans, Humidifier, LED Lights via GPIO relays
+- **Rule-based automation** - Mathematical threshold control (no AI/ML training needed)
 - **Local REST API** - Direct control from mobile app on same network
 - **Cloud connectivity** - Remote control via backend when on internet
 - **Offline-first data storage** - SQLite with backend synchronization
 - **Auto-boot service** - Runs automatically on power-up
 - **mDNS discovery** - Device findable on local network
+
+> **Note**: The automation system uses **rule-based mathematical control**, not AI or machine learning. No training datasets or model training required - the system works immediately with scientifically-derived thresholds. See [RULE_BASED_AUTOMATION_GUIDE.md](RULE_BASED_AUTOMATION_GUIDE.md) for details.
 
 ## Documentation
 
@@ -24,6 +27,9 @@ This project implements the IoT device component of the M.A.S.H. thesis project,
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete technical documentation
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - What was built and how
 - **[SCHEMA_USAGE.md](SCHEMA_USAGE.md)** - Backend database integration details
+- **[RULE_BASED_AUTOMATION_GUIDE.md](RULE_BASED_AUTOMATION_GUIDE.md)** - Automated control system guide
+- **[CONTROL_SYSTEM_OVERVIEW.md](CONTROL_SYSTEM_OVERVIEW.md)** - Quick reference for presentations
+- **[MIGRATION_TO_RULE_BASED.md](MIGRATION_TO_RULE_BASED.md)** - AI to rule-based migration notes
 
 ## Directory Structure
 

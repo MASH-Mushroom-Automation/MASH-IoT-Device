@@ -52,7 +52,7 @@ class Config:
             'device_model': os.getenv('DEVICE_MODEL', 'RPi3-ModelB'),
             
             # Backend Configuration
-            'backend_api_url': os.getenv('BACKEND_API_URL', 'https://mash-backend.onrender.com/api'),
+            'backend_api_url': os.getenv('BACKEND_API_URL', 'https://mash-backend-api-production.up.railway.app'),
             'backend_api_key': os.getenv('BACKEND_API_KEY', ''),
             
             # MQTT Configuration
@@ -95,9 +95,34 @@ class Config:
             'log_max_size': int(os.getenv('LOG_MAX_SIZE', '10485760')),  # 10MB
             'log_backup_count': int(os.getenv('LOG_BACKUP_COUNT', '5')),
             
+            # Bluetooth Configuration
+            'bluetooth_enabled': os.getenv('BLUETOOTH_ENABLED', 'true').lower() == 'true',
+            'bluetooth_discoverable_on_startup': os.getenv('BLUETOOTH_DISCOVERABLE_ON_STARTUP', 'true').lower() == 'true',
+            'bluetooth_discoverable_timeout': int(os.getenv('BLUETOOTH_DISCOVERABLE_TIMEOUT', '300')),
+            'bluetooth_device_name': os.getenv('BLUETOOTH_DEVICE_NAME', 'MASH-IoT-Device'),
+            'bluetooth_pairing_required': os.getenv('BLUETOOTH_PAIRING_REQUIRED', 'true').lower() == 'true',
+            'bluetooth_tethering_enabled': os.getenv('BLUETOOTH_TETHERING_ENABLED', 'true').lower() == 'true',
+            'bluetooth_tethering_auto_start': os.getenv('BLUETOOTH_TETHERING_AUTO_START', 'false').lower() == 'true',
+            'bluetooth_tethering_interface': os.getenv('BLUETOOTH_TETHERING_INTERFACE', 'bnep0'),
+            
+            # GPIO Configuration
+            'gpio_mode': os.getenv('GPIO_MODE', 'BCM'),
+            'gpio_relay_blower_fan': int(os.getenv('GPIO_RELAY_BLOWER_FAN', '22')),
+            'gpio_relay_exhaust_fan': int(os.getenv('GPIO_RELAY_EXHAUST_FAN', '27')),
+            'gpio_relay_humidifier': int(os.getenv('GPIO_RELAY_HUMIDIFIER', '17')),
+            'gpio_relay_led_lights': int(os.getenv('GPIO_RELAY_LED_LIGHTS', '18')),
+            'gpio_active_low': os.getenv('GPIO_ACTIVE_LOW', 'true').lower() == 'true',
+            
+            # API Server Configuration
+            'api_host': os.getenv('API_HOST', '0.0.0.0'),
+            'api_port': int(os.getenv('API_PORT', '5000')),
+            'api_debug': os.getenv('API_DEBUG', 'false').lower() == 'true',
+            'api_cors_enabled': os.getenv('API_CORS_ENABLED', 'true').lower() == 'true',
+            
             # Development/Testing
             'mock_mode': os.getenv('MOCK_MODE', 'false').lower() == 'true',
-            'debug_mode': os.getenv('DEBUG_MODE', 'false').lower() == 'true'
+            'debug_mode': os.getenv('DEBUG_MODE', 'false').lower() == 'true',
+            'simulation_mode': os.getenv('SIMULATION_MODE', 'false').lower() == 'true'
         }
         
         # Update config with defaults (only if not already set)
@@ -156,6 +181,68 @@ class Config:
             self.logger.info(f"Configuration saved to {file_path}")
         except Exception as e:
             self.logger.error(f"Failed to save configuration: {e}")
+    
+    def get_nested(self, *keys, default: Any = None) -> Any:
+        """
+        Get nested configuration value using dot notation or multiple keys
+        
+        Args:
+            *keys: Configuration keys (e.g., 'bluetooth', 'enabled' or 'bluetooth.enabled')
+            default: Default value if key not found
+            
+        Returns:
+            Configuration value or default
+        """
+        # Handle dot notation
+        if len(keys) == 1 and '.' in keys[0]:
+            keys = keys[0].split('.')
+        
+        value = self._config
+        for key in keys:
+            if isinstance(value, dict):
+                value = value.get(key)
+                if value is None:
+                    return default
+            else:
+                return default
+        return value
+    
+    def get_bluetooth_config(self) -> Dict[str, Any]:
+        """Get Bluetooth configuration"""
+        return {
+            'enabled': self.get('bluetooth_enabled', True),
+            'discoverable_on_startup': self.get('bluetooth_discoverable_on_startup', True),
+            'discoverable_timeout': self.get('bluetooth_discoverable_timeout', 300),
+            'device_name': self.get('bluetooth_device_name', 'MASH-IoT-Device'),
+            'pairing_required': self.get('bluetooth_pairing_required', True),
+            'tethering': {
+                'enabled': self.get('bluetooth_tethering_enabled', True),
+                'auto_start': self.get('bluetooth_tethering_auto_start', False),
+                'interface': self.get('bluetooth_tethering_interface', 'bnep0')
+            }
+        }
+    
+    def get_gpio_config(self) -> Dict[str, Any]:
+        """Get GPIO configuration"""
+        return {
+            'mode': self.get('gpio_mode', 'BCM'),
+            'relays': {
+                'blower_fan': self.get('gpio_relay_blower_fan', 22),
+                'exhaust_fan': self.get('gpio_relay_exhaust_fan', 27),
+                'humidifier': self.get('gpio_relay_humidifier', 17),
+                'led_lights': self.get('gpio_relay_led_lights', 18)
+            },
+            'active_low': self.get('gpio_active_low', True)
+        }
+    
+    def get_api_config(self) -> Dict[str, Any]:
+        """Get API server configuration"""
+        return {
+            'host': self.get('api_host', '0.0.0.0'),
+            'port': self.get('api_port', 5000),
+            'debug': self.get('api_debug', False),
+            'cors_enabled': self.get('api_cors_enabled', True)
+        }
     
     def validate(self) -> bool:
         """

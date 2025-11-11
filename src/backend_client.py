@@ -7,8 +7,7 @@ import os
 import requests
 import logging
 import time
-import json
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List, Union, Optional
 from datetime import datetime
 import threading
 
@@ -39,6 +38,10 @@ class BackendClient:
         self.timeout = timeout
         self.mock_mode = mock_mode
         
+        # Debug logging
+        self.logger.info(f"Backend client initialized with device ID: '{self.device_id}'")
+        self.logger.info(f"API URL: {self.api_url}")
+        
         # State
         self.is_registered = False
         self.registration_data = None
@@ -48,7 +51,8 @@ class BackendClient:
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'User-Agent': f'MASH-IoT-Device/{device_id}'
+            'User-Agent': f'MASH-IoT-Device/{device_id}',
+            'X-Requested-With': 'XMLHttpRequest'  # Bypass CSRF for API calls
         })
         
         if self.api_key:
@@ -56,9 +60,75 @@ class BackendClient:
                 'Authorization': f'Bearer {api_key}'
             })
     
+    def lookup_device(self) -> bool:
+        """
+        Look up device in backend by serial number
+        
+        Returns:
+            True if device found and details retrieved
+        """
+        if self.mock_mode:
+            self.logger.info(f"Mock: Device found in backend: {self.device_id}")
+            self.is_registered = True
+            return True
+        
+        try:
+            self.logger.info(f"Looking up device in backend: {self.device_id}")
+            self.logger.info(f"API URL: {self.api_url}/iot/devices/serial/{self.device_id}")
+            
+            # Make sure the device_id is properly formatted
+            if not self.device_id or not isinstance(self.device_id, str):
+                self.logger.error(f"Invalid device ID: {self.device_id}")
+                return False
+                
+            # Print headers for debugging
+            self.logger.info(f"Request headers: {self.session.headers}")
+            
+            response = self.session.get(
+                f'{self.api_url}/iot/devices/serial/{self.device_id}',
+                timeout=self.timeout
+            )
+            
+            self.logger.info(f"Response status code: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.is_registered = True
+                self.registration_data = data.get('data')
+                
+                # Debug logging for response data
+                self.logger.info(f"Response data structure: {data.keys()}")
+                if 'data' in data:
+                    self.logger.info(f"Device data keys: {self.registration_data.keys() if self.registration_data else 'None'}")
+                else:
+                    self.logger.warning("No 'data' field in response")
+                
+                # Check if the returned device has the same serial number
+                returned_serial = self.registration_data.get('serialNumber')
+                if returned_serial and returned_serial != self.device_id:
+                    self.logger.warning(f"Found device with different serial number: {returned_serial} (expected {self.device_id})")
+                    self.logger.warning("Using this device for testing purposes")
+                    # Update our device_id to match the one from the backend
+                    self.device_id = returned_serial
+                elif not returned_serial:
+                    self.logger.warning(f"Device found but no serial number returned, keeping original: {self.device_id}")
+                
+                self.logger.info(f"Device found in backend: {self.registration_data}")
+                return True
+            else:
+                self.logger.error(f"Device not found in backend: {response.status_code} - {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Network error during device lookup: {e}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error looking up device: {e}")
+            return False
+    
     def register_device(self, 
-                       user_id: str,
-                       device_info: Dict[str, Any]) -> bool:
+                       user_id: Optional[str] = None,
+                       device_info: Dict[str, Any] = None) -> bool:
         """
         Register device with backend
         
@@ -77,8 +147,11 @@ class BackendClient:
         try:
             self.logger.info(f"Registering device with backend: {self.device_id}")
             
+            if device_info is None:
+                device_info = {}
+                
+            # Create payload with required fields
             payload = {
-                'userId': user_id,
                 'serialNumber': self.device_id,
                 'name': device_info.get('name', f'MASH Chamber {self.device_id[-6:]}'),
                 'type': device_info.get('type', 'MUSHROOM_CHAMBER'),
@@ -90,8 +163,14 @@ class BackendClient:
                 'isActive': True
             }
             
+            # Add userId only if provided with a non-empty value
+            if user_id and user_id.strip():
+                payload['userId'] = user_id
+            else:
+                self.logger.info("No user ID provided, device will be registered without a user")
+            
             response = self.session.post(
-                f'{self.api_url}/devices',
+                f'{self.api_url}/iot/devices',
                 json=payload,
                 timeout=self.timeout
             )
@@ -117,48 +196,75 @@ class BackendClient:
             self.logger.error(f"Error registering device: {e}")
             return False
     
-    def update_device_status(self, 
-                            status: str,
-                            device_info: Optional[Dict[str, Any]] = None) -> bool:
+    def update_device_status(self, status: str, additional_data: Dict[str, Any] = None) -> bool:
         """
-        Update device status on backend
+        Update device status in backend
         
         Args:
-            status: Device status (ONLINE, OFFLINE, MAINTENANCE, ERROR)
-            device_info: Additional device information
+            status: Device status (ONLINE, OFFLINE, etc)
+            additional_data: Additional data to update
             
         Returns:
-            True if update successful
+            True if status updated successfully
         """
         if self.mock_mode:
-            self.logger.debug(f"Mock: Device status updated to {status}")
             return True
         
         try:
+            # First check if we have registration data
+            if not self.is_registered:
+                self.logger.warning("Device not registered, attempting to look up device first")
+                if not self.lookup_device():
+                    self.logger.error("Device not found in backend, cannot update status")
+                    return False
+            
+            # Format the timestamp in a way that's compatible with the backend
+            # Use UTC time to avoid timezone issues
+            current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             payload = {
                 'status': status,
-                'lastSeen': datetime.now().isoformat()
+                'lastSeen': current_time
             }
+            self.logger.info(f"Using timestamp: {current_time}")
             
-            if device_info:
-                if 'ip_address' in device_info:
-                    payload['ipAddress'] = device_info['ip_address']
-                if 'firmware' in device_info:
-                    payload['firmware'] = device_info['firmware']
+            # Add any additional data
+            if additional_data:
+                payload.update(additional_data)
+                
+            # Remove userId from payload to prevent null value errors
+            if 'userId' in payload and payload['userId'] is None:
+                del payload['userId']
+                
+            # Filter out unsupported fields
+            allowed_fields = ['status', 'lastSeen', 'firmware', 'ipAddress', 'macAddress', 'name', 'description', 'location']
+            filtered_payload = {k: v for k, v in payload.items() if k in allowed_fields}
+            payload = filtered_payload
+            
+            self.logger.info(f"Sending payload: {payload}")
+            
+            # Make sure we have a valid device ID
+            if not self.device_id or self.device_id == 'None':
+                self.logger.error("Cannot update device status: Invalid device ID")
+                return False
+                
+            self.logger.info(f"Updating device status to {status} for {self.device_id}")
             
             response = self.session.patch(
-                f'{self.api_url}/devices/serial/{self.device_id}',
+                f'{self.api_url}/iot/devices/serial/{self.device_id}',
                 json=payload,
                 timeout=self.timeout
             )
             
             if response.status_code == 200:
-                self.logger.debug(f"Device status updated to {status}")
+                self.logger.info("Device status updated successfully")
                 return True
             else:
-                self.logger.warning(f"Failed to update status: {response.status_code}")
+                self.logger.error(f"Failed to update device status: {response.status_code} - {response.text}")
                 return False
                 
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Network error updating device status: {e}")
+            return False
         except Exception as e:
             self.logger.error(f"Error updating device status: {e}")
             return False
@@ -179,8 +285,10 @@ class BackendClient:
         try:
             # Get device ID from backend (if registered)
             if not self.registration_data:
-                self.logger.warning("Device not registered, cannot send sensor data")
-                return False
+                self.logger.warning("Device not registered, attempting to look up device first")
+                if not self.lookup_device():
+                    self.logger.error("Device not found in backend, cannot send sensor data")
+                    return False
             
             backend_device_id = self.registration_data.get('id')
             
@@ -226,7 +334,10 @@ class BackendClient:
         
         try:
             if not self.registration_data:
-                return False
+                self.logger.warning("Device not registered, attempting to look up device first")
+                if not self.lookup_device():
+                    self.logger.error("Device not found in backend, cannot send sensor data batch")
+                    return False
             
             backend_device_id = self.registration_data.get('id')
             user_id = self.registration_data.get('userId')
@@ -269,7 +380,10 @@ class BackendClient:
         
         try:
             if not self.registration_data:
-                return []
+                self.logger.warning("Device not registered, attempting to look up device first")
+                if not self.lookup_device():
+                    self.logger.error("Device not found in backend, cannot get device commands")
+                    return []
             
             backend_device_id = self.registration_data.get('id')
             
@@ -335,7 +449,10 @@ class BackendClient:
         
         try:
             if not self.registration_data:
-                return False
+                self.logger.warning("Device not registered, attempting to look up device first")
+                if not self.lookup_device():
+                    self.logger.error("Device not found in backend, cannot send health data")
+                    return False
             
             backend_device_id = self.registration_data.get('id')
             

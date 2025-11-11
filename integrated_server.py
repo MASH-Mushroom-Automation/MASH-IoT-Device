@@ -6,14 +6,22 @@ Combines sensor reading, actuator control, and HTTP API
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import serial
+import os
 import time
 import threading
 from datetime import datetime
 from collections import deque
 import logging
-from ai_automation import AIAutomationEngine
+import os
+import socket
+from dotenv import load_dotenv
+from rule_based_controller import RuleBasedController
 from data_logger import DataLogger
+from src.utils.bluetooth_manager import BluetoothManager
+from src.utils.bluetooth_tethering import BluetoothTethering
+from src.utils.config import Config
+from src.backend_client import BackendClient
+from src.firebase_client import FirebaseClient
 
 try:
     import RPi.GPIO as GPIO
@@ -22,28 +30,70 @@ except ImportError:
     GPIO_AVAILABLE = False
     print("WARNING: RPi.GPIO not available, running in simulation mode")
 
-# ========== Configuration ==========
+
+def get_ip_address():
+    """Get the device's IP address"""
+    try:
+        # Create a socket connection to an external server
+        # This doesn't actually establish a connection, but gets the local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip_address = s.getsockname()[0]
+        s.close()
+        return ip_address
+    except Exception as e:
+        logging.error(f"Error getting IP address: {e}")
+        return "127.0.0.1"  # Return localhost as fallback
+
+
+def get_mac_address():
+    """Get the device's MAC address"""
+    try:
+        # Try to get the MAC address of the primary interface
+        import uuid
+        # Get the hex representation of the MAC address
+        mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
+                        for elements in range(0, 8*6, 8)][::-1])
+        return mac
+    except Exception as e:
+        logging.error(f"Error getting MAC address: {e}")
+        return ""  # Return empty string as fallback
+
+# ========== Load Environment Variables ==========
+load_dotenv()
+
+# ========== Load Configuration ==========
+config = Config(config_file='config/device_config.yaml')
+
+# Validate configuration
+if not config.validate():
+    print("ERROR: Invalid configuration. Please check config/device_config.yaml")
+    exit(1)
+
+# ========== Configuration Values ==========
 # Device Identity
-DEVICE_ID = 'MASH-A1-CAL25-AC2415'
-DEVICE_NAME = 'Mushroom Prototype Chamber'
+DEVICE_ID = config.get_nested('device', 'id', default='MASH-A1-CAL25-D5A91F')
+DEVICE_NAME = config.get_nested('device', 'name', default='MASH Chamber #1')
 
 # Serial Configuration (Arduino)
-SERIAL_PORT = '/dev/ttyACM0'
-SERIAL_BAUD = 9600
+SERIAL_PORT = config.get_nested('sensors', 'serial', 'port', default='/dev/ttyUSB0')
+SERIAL_BAUD = config.get_nested('sensors', 'serial', 'baud_rate', default=9600)
 
 # GPIO Pin Configuration (BCM numbering)
-RELAY_BLOWER_FAN = 22
-RELAY_EXHAUST_FAN = 27
-RELAY_HUMIDIFIER = 17
-RELAY_LED_LIGHTS = 18
+gpio_config = config.get_gpio_config()
+RELAY_BLOWER_FAN = gpio_config['relays']['blower_fan']
+RELAY_EXHAUST_FAN = gpio_config['relays']['exhaust_fan']
+RELAY_HUMIDIFIER = gpio_config['relays']['humidifier']
+RELAY_LED_LIGHTS = gpio_config['relays']['led_lights']
 
 # Data collection
 WINDOW_SIZE = 30
 READING_HISTORY = deque(maxlen=WINDOW_SIZE)
 
 # ========== Logging Setup ==========
+log_level = config.get('log_level', 'INFO')
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level.upper()),
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -141,11 +191,66 @@ class ActuatorController:
 # Initialize actuator controller
 actuator_controller = ActuatorController()
 
-# Initialize AI automation engine
-ai_engine = AIAutomationEngine()
+# Initialize rule-based automation controller
+automation_controller = RuleBasedController()
 
 # Initialize data logger
 data_logger = DataLogger()
+
+# Initialize Bluetooth manager and tethering
+bluetooth_manager = BluetoothManager()
+bluetooth_tethering = BluetoothTethering(bluetooth_manager)
+
+# Initialize Backend Client
+backend_client = None
+try:
+    # Get device ID from config file
+    device_id = config.get_nested('device', 'id')
+    if not device_id:
+        device_id = os.getenv('DEVICE_ID', 'MASH-A1-CAL25-D5A91F')
+    
+    # Debug logging
+    logger.info(f"Device ID from config: '{device_id}'")
+    logger.info(f"DEVICE_ID variable: '{DEVICE_ID}'")
+    
+    backend_api_url = os.getenv('BACKEND_API_URL', config.get('backend_api_url', 'https://mash-backend-api-production.up.railway.app/api/v1'))
+    backend_api_key = os.getenv('BACKEND_API_KEY', config.get('backend_api_key', ''))
+    backend_timeout = int(os.getenv('BACKEND_TIMEOUT', config.get('backend_timeout', 30)))
+    
+    backend_client = BackendClient(
+        api_url=backend_api_url,
+        device_id=device_id,  # Use the device ID from config
+        api_key=backend_api_key if backend_api_key else None,
+        timeout=backend_timeout,
+        mock_mode=not backend_api_url.startswith('http')
+    )
+    logger.info(f"✅ Backend client initialized: {backend_api_url}")
+    logger.info(f"✅ Using device ID: {device_id}")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize backend client: {e}")
+
+# Initialize Firebase Client
+firebase_client = None
+try:
+    firebase_project_id = os.getenv('FIREBASE_PROJECT_ID', config.get('firebase_project_id', ''))
+    firebase_database_url = os.getenv('FIREBASE_DATABASE_URL', config.get('firebase_database_url', ''))
+    firebase_client_email = os.getenv('FIREBASE_CLIENT_EMAIL', config.get('firebase_client_email', ''))
+    firebase_private_key = os.getenv('FIREBASE_PRIVATE_KEY', config.get('firebase_private_key', ''))
+    
+    if firebase_project_id and firebase_database_url:
+        firebase_client = FirebaseClient(
+            project_id=firebase_project_id,
+            database_url=firebase_database_url,
+            service_account_email=firebase_client_email,
+            private_key=firebase_private_key,
+            device_id=DEVICE_ID,
+            mock_mode=not firebase_database_url.startswith('http')
+        )
+        logger.info(f"✅ Firebase client initialized: {firebase_database_url}")
+    else:
+        logger.warning("⚠️ Firebase credentials not found, running without Firebase")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize Firebase client: {e}")
 
 
 # ========== Serial Communication ==========
@@ -254,6 +359,9 @@ def read_sensor_data():
                         # Log to database
                         data_logger.log_sensor_reading(data)
                         
+                        # Sync to Backend and Firebase
+                        sync_sensor_data(data)
+                        
                         logger.debug(f"Sensor data: CO2={data['co2']}ppm, T={data['temperature']}°C, H={data['humidity']}%")
                 
                 # Handle mode changes
@@ -274,6 +382,76 @@ def read_sensor_data():
         time.sleep(0.1)
 
 
+# ========== Data Syncing Functions ==========
+def sync_sensor_data(data):
+    """Sync sensor data to Backend and Firebase"""
+    try:
+        # Sync to Backend
+        if backend_client:
+            threading.Thread(
+                target=lambda: backend_client.send_sensor_data(data),
+                daemon=True
+            ).start()
+        
+        # Sync to Firebase
+        if firebase_client:
+            threading.Thread(
+                target=lambda: firebase_client.send_sensor_data(data),
+                daemon=True
+            ).start()
+            
+    except Exception as e:
+        logger.error(f"Error syncing sensor data: {e}")
+
+
+def sync_device_status():
+    """Sync device status to Backend and Firebase"""
+    try:
+        # Only include fields that are supported by the Prisma schema
+        # Format the timestamp in a way that's compatible with the backend
+        # Use UTC time to avoid timezone issues
+        current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+        status_data = {
+            'status': 'ONLINE',
+            'lastSeen': current_time,
+            'firmware': '1.0.0',
+            'ipAddress': get_ip_address(),
+            'macAddress': get_mac_address()
+        }
+        logger.info(f"Using timestamp: {current_time}")
+        
+        # Sync to Backend
+        if backend_client:
+            threading.Thread(
+                target=lambda: backend_client.update_device_status('ONLINE', status_data),
+                daemon=True
+            ).start()
+        
+        # Sync to Firebase
+        if firebase_client:
+            threading.Thread(
+                target=lambda: firebase_client.send_device_status(status_data),
+                daemon=True
+            ).start()
+            
+    except Exception as e:
+        logger.error(f"Error syncing device status: {e}")
+
+
+def sync_actuator_states():
+    """Sync actuator states to Backend and Firebase"""
+    try:
+        # Sync to Firebase
+        if firebase_client:
+            threading.Thread(
+                target=lambda: firebase_client.send_actuator_states(actuator_states.copy()),
+                daemon=True
+            ).start()
+            
+    except Exception as e:
+        logger.error(f"Error syncing actuator states: {e}")
+
+
 def send_command_to_arduino(command):
     """Send command to Arduino via serial"""
     try:
@@ -287,19 +465,19 @@ def send_command_to_arduino(command):
         return False
 
 
-def ai_automation_loop():
-    """AI automation loop - runs every 10 seconds"""
-    logger.info("Starting AI automation loop...")
+def automation_loop():
+    """Rule-based automation loop - runs every 10 seconds"""
+    logger.info("Starting rule-based automation loop...")
     
     while True:
         try:
-            if ai_engine.is_enabled():
+            if automation_controller.is_enabled():
                 with data_lock:
                     current_sensor_data = sensor_data.copy()
                     current_actuator_states = actuator_states.copy()
                 
-                # Get AI decision
-                decision = ai_engine.analyze_and_decide(
+                # Get automation decision
+                decision = automation_controller.analyze_and_decide(
                     current_sensor_data,
                     current_actuator_states
                 )
@@ -309,21 +487,24 @@ def ai_automation_loop():
                     for actuator, state in decision['actions'].items():
                         if actuator in actuator_states:
                             actuator_controller.set_actuator(actuator, state)
-                            logger.info(f"AI Action: {actuator} -> {'ON' if state else 'OFF'}")
+                            logger.info(f"Automation Action: {actuator} -> {'ON' if state else 'OFF'}")
                     
                     # Log actuator changes
-                    data_logger.log_actuator_change(actuator_states, current_sensor_data.get('mode', 's'), 'ai')
+                    data_logger.log_actuator_change(actuator_states, current_sensor_data.get('mode', 's'), 'automation')
+                    
+                    # Sync actuator states
+                    sync_actuator_states()
                     
                     # Log reasoning
                     if decision.get('reasoning'):
                         for reason in decision['reasoning']:
                             logger.info(f"   Reasoning: {reason}")
                 
-                # Log AI decision
-                data_logger.log_ai_decision(decision)
+                # Log automation decision
+                data_logger.log_automation_decision(decision)
             
         except Exception as e:
-            logger.error(f"ERROR: Error in AI automation loop: {e}")
+            logger.error(f"ERROR: Error in automation loop: {e}")
         
         time.sleep(10)  # Run every 10 seconds
 
@@ -469,9 +650,9 @@ def get_actuator_states():
 
 @app.route('/api/automation/status', methods=['GET'])
 def get_automation_status():
-    """Get AI automation status"""
+    """Get rule-based automation status"""
     try:
-        status = ai_engine.get_status()
+        status = automation_controller.get_status()
         return jsonify({
             'success': True,
             'data': status
@@ -486,14 +667,14 @@ def get_automation_status():
 
 @app.route('/api/automation/enable', methods=['POST'])
 def enable_automation():
-    """Enable AI automation"""
+    """Enable rule-based automation"""
     try:
-        ai_engine.enable()
+        automation_controller.enable()
         return jsonify({
             'success': True,
             'data': {
                 'enabled': True,
-                'message': 'AI automation enabled'
+                'message': 'Rule-based automation enabled'
             }
         })
     except Exception as e:
@@ -506,14 +687,14 @@ def enable_automation():
 
 @app.route('/api/automation/disable', methods=['POST'])
 def disable_automation():
-    """Disable AI automation"""
+    """Disable rule-based automation"""
     try:
-        ai_engine.disable()
+        automation_controller.disable()
         return jsonify({
             'success': True,
             'data': {
                 'enabled': False,
-                'message': 'AI automation disabled'
+                'message': 'Rule-based automation disabled'
             }
         })
     except Exception as e:
@@ -526,10 +707,10 @@ def disable_automation():
 
 @app.route('/api/automation/history', methods=['GET'])
 def get_automation_history():
-    """Get AI decision history"""
+    """Get automation decision history"""
     try:
         limit = request.args.get('limit', 10, type=int)
-        history = ai_engine.get_decision_history(limit)
+        history = automation_controller.get_decision_history(limit)
         return jsonify({
             'success': True,
             'data': {
@@ -661,6 +842,90 @@ def get_statistics():
         }), 500
 
 
+@app.route('/api/bluetooth/status', methods=['GET'])
+def get_bluetooth_status():
+    """Get Bluetooth status"""
+    try:
+        status = bluetooth_manager.get_status()
+        tethering_status = bluetooth_tethering.get_status()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'bluetooth': status,
+                'tethering': tethering_status
+            }
+        })
+    except Exception as e:
+        logger.error(f"ERROR: Error getting Bluetooth status: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/bluetooth/tethering', methods=['POST'])
+def control_bluetooth_tethering():
+    """Start or stop Bluetooth tethering"""
+    try:
+        data = request.get_json()
+        action = data.get('action', '').lower()
+        
+        if action == 'start':
+            success = bluetooth_tethering.start_tethering()
+            message = 'Bluetooth tethering started' if success else 'Failed to start tethering'
+        elif action == 'stop':
+            success = bluetooth_tethering.stop_tethering()
+            message = 'Bluetooth tethering stopped' if success else 'Failed to stop tethering'
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid action. Use "start" or "stop"'
+            }), 400
+        
+        return jsonify({
+            'success': success,
+            'data': {
+                'action': action,
+                'message': message,
+                'status': bluetooth_tethering.get_status()
+            }
+        })
+    except Exception as e:
+        logger.error(f"ERROR: Error controlling Bluetooth tethering: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/bluetooth/discoverable', methods=['POST'])
+def set_bluetooth_discoverable():
+    """Set Bluetooth discoverable mode"""
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', True)
+        timeout = data.get('timeout', 180)
+        
+        success = bluetooth_manager.set_discoverable(enabled, timeout)
+        message = f'Bluetooth discoverable {"enabled" if enabled else "disabled"}'
+        
+        return jsonify({
+            'success': success,
+            'data': {
+                'discoverable': enabled,
+                'timeout': timeout if enabled else 0,
+                'message': message
+            }
+        })
+    except Exception as e:
+        logger.error(f"ERROR: Error setting Bluetooth discoverable: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -670,7 +935,8 @@ def health_check():
             'status': 'healthy',
             'serialConnected': ser is not None and ser.is_open if ser else False,
             'gpioAvailable': GPIO_AVAILABLE,
-            'aiAutomationEnabled': ai_engine.is_enabled(),
+            'automationEnabled': automation_controller.is_enabled(),
+            'bluetoothAvailable': bluetooth_manager.is_available(),
             'timestamp': datetime.now().isoformat()
         }
     })
@@ -678,9 +944,127 @@ def health_check():
 
 # ========== Main ==========
 if __name__ == '__main__':
+    start_time = time.time()  # Track uptime
+    
     logger.info("Starting MASH IoT Device Server")
     logger.info(f"Device ID: {DEVICE_ID}")
     logger.info(f"Device Name: {DEVICE_NAME}")
+    logger.info(f"Configuration loaded from: config/device_config.yaml")
+    
+    # Connect to Backend and Firebase
+    logger.info("Connecting to Backend and Firebase...")
+    
+    # Look up device in backend instead of registering
+    if backend_client:
+        try:
+            logger.info("Looking up device in backend...")
+            if backend_client.lookup_device():
+                logger.info("Device found in backend successfully")
+                
+                # Check if device ID changed (backend returned a different device)
+                if backend_client.device_id and backend_client.device_id != DEVICE_ID:
+                    logger.warning(f"Using different device from backend: {backend_client.device_id} (original: {DEVICE_ID})")
+                    DEVICE_ID = backend_client.device_id
+                
+                # Update device status to online
+                # Format the timestamp in a way that's compatible with the backend
+                # Use UTC time to avoid timezone issues
+                current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                status_data = {
+                    'status': 'ONLINE',
+                    'lastSeen': current_time,
+                    'firmware': '1.0.0',
+                    'ipAddress': get_ip_address(),
+                    'macAddress': get_mac_address()
+                }
+                logger.info(f"Using timestamp: {current_time}")
+                
+                try:
+                    if backend_client.update_device_status('ONLINE', status_data):
+                        logger.info("Device status updated to ONLINE")
+                    else:
+                        logger.warning("Failed to update device status")
+                except Exception as e:
+                    logger.error(f"Error updating device status: {e}")
+            else:
+                logger.error("ERROR: Device not registered in backend. Please register this device in the Admin Dashboard first.")
+                logger.info("Continuing with limited functionality. Some features may not work properly.")
+                # You could exit here if you want to prevent operation without backend registration
+                # import sys
+                # sys.exit(1)  # Uncomment to exit if device not registered
+                
+        except Exception as e:
+            logger.error(f"Backend lookup error: {e}")
+    
+    # Connect to Firebase
+    if firebase_client:
+        try:
+            if firebase_client.connect():
+                logger.info("Connected to Firebase successfully")
+                
+                # Start listening for commands
+                def handle_firebase_command(command_data):
+                    logger.info(f"Firebase command received: {command_data}")
+                    # Handle command based on type
+                    command_type = command_data.get('type')
+                    if command_type == 'set_mode':
+                        mode = command_data.get('mode', 's')
+                        send_command_to_arduino(mode)
+                    elif command_type == 'set_actuator':
+                        actuator = command_data.get('actuator')
+                        state = command_data.get('state', False)
+                        if actuator in actuator_states:
+                            actuator_controller.set_actuator(actuator, state)
+                            sync_actuator_states()
+                
+                firebase_client.listen_for_commands(handle_firebase_command)
+                
+                # Send initial device status
+                sync_device_status()
+                
+            else:
+                logger.warning("Failed to connect to Firebase")
+                
+        except Exception as e:
+            logger.error(f"Firebase connection error: {e}")
+    
+    # Start periodic status sync (every 5 minutes)
+    def periodic_status_sync():
+        while True:
+            try:
+                sync_device_status()
+                time.sleep(300)  # 5 minutes
+            except Exception as e:
+                logger.error(f"Error in periodic status sync: {e}")
+                time.sleep(60)  # Wait 1 minute on error
+    
+    status_sync_thread = threading.Thread(target=periodic_status_sync, daemon=True)
+    status_sync_thread.start()
+    logger.info("Periodic status sync started (every 5 minutes)")
+    
+    # Initialize Bluetooth (if enabled in config)
+    bt_config = config.get_bluetooth_config()
+    if bt_config['enabled']:
+        try:
+            if bluetooth_manager.is_available():
+                logger.info("Bluetooth is available")
+                
+                # Make device discoverable on startup if configured
+                if bt_config['discoverable_on_startup']:
+                    timeout = bt_config['discoverable_timeout']
+                    bluetooth_manager.set_discoverable(True, timeout=timeout)
+                    logger.info(f"Bluetooth set to discoverable mode ({timeout} seconds)")
+                
+                # Auto-start tethering if configured
+                if bt_config['tethering']['auto_start']:
+                    logger.info("Auto-starting Bluetooth tethering...")
+                    bluetooth_tethering.start_tethering()
+            else:
+                logger.warning("WARNING: Bluetooth not available on this system")
+        except Exception as e:
+            logger.error(f"ERROR: Failed to initialize Bluetooth: {e}")
+    else:
+        logger.info("Bluetooth is disabled in configuration")
     
     # Initialize serial connection
     if init_serial():
@@ -691,15 +1075,20 @@ if __name__ == '__main__':
     else:
         logger.warning("WARNING: Running without Arduino connection")
     
-    # Start AI automation thread
-    ai_thread = threading.Thread(target=ai_automation_loop, daemon=True)
-    ai_thread.start()
-    logger.info("AI automation thread started")
+    # Start rule-based automation thread
+    automation_thread = threading.Thread(target=automation_loop, daemon=True)
+    automation_thread.start()
+    logger.info("Rule-based automation thread started")
     
     try:
-        # Start Flask server
-        logger.info("Starting HTTP server on port 5000")
-        app.run(host='0.0.0.0', port=5000, debug=False)
+        # Start Flask server with configured settings
+        api_config = config.get_api_config()
+        logger.info(f"Starting HTTP server on {api_config['host']}:{api_config['port']}")
+        app.run(
+            host=api_config['host'],
+            port=api_config['port'],
+            debug=api_config['debug']
+        )
     except KeyboardInterrupt:
         logger.info("\nShutting down...")
     finally:
