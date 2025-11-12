@@ -19,6 +19,7 @@ from rule_based_controller import RuleBasedController
 from data_logger import DataLogger
 from src.utils.bluetooth_manager import BluetoothManager
 from src.utils.bluetooth_tethering import BluetoothTethering
+from src.utils.bluetooth_setup import setup_bluetooth
 from src.utils.config import Config
 from src.backend_client import BackendClient
 from src.firebase_client import FirebaseClient
@@ -198,7 +199,10 @@ automation_controller = RuleBasedController()
 data_logger = DataLogger()
 
 # Initialize Bluetooth manager and tethering
-bluetooth_manager = BluetoothManager()
+bt_config = config.get_bluetooth_config()
+bluetooth_device_name = bt_config['device_name']
+logger.info(f"Initializing Bluetooth with device name: {bluetooth_device_name}")
+bluetooth_manager = BluetoothManager(device_name=bluetooth_device_name)
 bluetooth_tethering = BluetoothTethering(bluetooth_manager)
 
 # Initialize Backend Client
@@ -404,15 +408,19 @@ def sync_sensor_data(data):
         logger.error(f"Error syncing sensor data: {e}")
 
 
-def sync_device_status():
-    """Sync device status to Backend and Firebase"""
+def sync_device_status(status='ONLINE'):
+    """Sync device status to Backend and Firebase
+    
+    Args:
+        status: Device status to set (default: 'ONLINE')
+    """
     try:
         # Only include fields that are supported by the Prisma schema
         # Format the timestamp in a way that's compatible with the backend
         # Use UTC time to avoid timezone issues
         current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
         status_data = {
-            'status': 'ONLINE',
+            'status': status,
             'lastSeen': current_time,
             'firmware': '1.0.0',
             'ipAddress': get_ip_address(),
@@ -423,7 +431,7 @@ def sync_device_status():
         # Sync to Backend
         if backend_client:
             threading.Thread(
-                target=lambda: backend_client.update_device_status('ONLINE', status_data),
+                target=lambda: backend_client.update_device_status(status, status_data),
                 daemon=True
             ).start()
         
@@ -436,6 +444,25 @@ def sync_device_status():
             
     except Exception as e:
         logger.error(f"Error syncing device status: {e}")
+
+
+def mark_device_offline():
+    """Mark device as offline in backend"""
+    try:
+        logger.info("Marking device as OFFLINE in backend")
+        # Use a direct call instead of a thread to ensure it completes before shutdown
+        if backend_client:
+            current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            status_data = {
+                'status': 'OFFLINE',
+                'lastSeen': current_time,
+                'ipAddress': get_ip_address(),
+                'macAddress': get_mac_address()
+            }
+            backend_client.update_device_status('OFFLINE', status_data)
+            logger.info("Device marked as OFFLINE successfully")
+    except Exception as e:
+        logger.error(f"Error marking device as offline: {e}")
 
 
 def sync_actuator_states():
@@ -847,7 +874,7 @@ def get_bluetooth_status():
     """Get Bluetooth status"""
     try:
         status = bluetooth_manager.get_status()
-        tethering_status = bluetooth_tethering.get_status()
+        tethering_status = bluetooth_tethering.get_tethering_status()
         
         return jsonify({
             'success': True,
@@ -857,7 +884,75 @@ def get_bluetooth_status():
             }
         })
     except Exception as e:
-        logger.error(f"ERROR: Error getting Bluetooth status: {e}")
+        logger.error(f"Error getting Bluetooth status: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/bluetooth/diagnostics', methods=['GET'])
+def bluetooth_diagnostics():
+    """Run Bluetooth diagnostics"""
+    try:
+        # Get device name from config
+        bt_config = config.get_bluetooth_config()
+        device_name = bt_config['device_name']
+        
+        # Check system Bluetooth status
+        from src.utils.bluetooth_setup import check_bluetooth_service
+        service_running = check_bluetooth_service()
+        
+        # Run hciconfig to get adapter info
+        hci_output = "Not available"
+        try:
+            result = subprocess.run(['hciconfig', '-a'], capture_output=True, text=True, check=False)
+            hci_output = result.stdout
+        except Exception as e:
+            hci_output = f"Error: {e}"
+        
+        # Check if device is discoverable
+        discoverable = False
+        try:
+            result = subprocess.run(['hciconfig', 'hci0', 'name'], capture_output=True, text=True, check=False)
+            discoverable = 'piscan' in result.stdout.lower()
+        except Exception:
+            pass
+        
+        # Try to make it discoverable again
+        try:
+            subprocess.run(['sudo', 'hciconfig', 'hci0', 'piscan'], check=False)
+            subprocess.run(['sudo', 'hciconfig', 'hci0', 'name', device_name], check=False)
+        except Exception:
+            pass
+        
+        # Get Bluetooth manager status
+        manager_status = bluetooth_manager.get_status()
+        
+        # Attempt to fix any issues
+        from src.utils.bluetooth_setup import setup_bluetooth
+        fix_attempt = setup_bluetooth(device_name)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'service_running': service_running,
+                'device_name': device_name,
+                'discoverable': discoverable,
+                'hciconfig_output': hci_output,
+                'manager_status': manager_status,
+                'fix_attempt': fix_attempt,
+                'recommendations': [
+                    "Restart the Bluetooth service with 'sudo systemctl restart bluetooth'",
+                    "Make sure the device is discoverable with 'sudo hciconfig hci0 piscan'",
+                    "Set the device name with 'sudo hciconfig hci0 name MASH-IoT-Device'",
+                    "Check if other devices can see this device",
+                    "Try restarting the IoT device"
+                ]
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error running Bluetooth diagnostics: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -907,7 +1002,9 @@ def set_bluetooth_discoverable():
         enabled = data.get('enabled', True)
         timeout = data.get('timeout', 180)
         
-        success = bluetooth_manager.set_discoverable(enabled, timeout)
+        # Use make_discoverable if enabled, otherwise we don't need to do anything
+        # since there's no explicit method to disable discoverability
+        success = bluetooth_manager.make_discoverable(timeout) if enabled else True
         message = f'Bluetooth discoverable {"enabled" if enabled else "disabled"}'
         
         return jsonify({
@@ -1028,19 +1125,19 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error(f"Firebase connection error: {e}")
     
-    # Start periodic status sync (every 5 minutes)
+    # Start periodic status sync (every 10 minutes)
     def periodic_status_sync():
         while True:
             try:
                 sync_device_status()
-                time.sleep(300)  # 5 minutes
+                time.sleep(600)  # 10 minutes
             except Exception as e:
                 logger.error(f"Error in periodic status sync: {e}")
                 time.sleep(60)  # Wait 1 minute on error
     
     status_sync_thread = threading.Thread(target=periodic_status_sync, daemon=True)
     status_sync_thread.start()
-    logger.info("Periodic status sync started (every 5 minutes)")
+    logger.info("Periodic status sync started (every 10 minutes)")
     
     # Initialize Bluetooth (if enabled in config)
     bt_config = config.get_bluetooth_config()
@@ -1049,11 +1146,24 @@ if __name__ == '__main__':
             if bluetooth_manager.is_available():
                 logger.info("Bluetooth is available")
                 
+                # Perform system-level Bluetooth setup
+                logger.info(f"Setting up Bluetooth with device name: {bluetooth_device_name}")
+                bt_setup_status = setup_bluetooth(bluetooth_device_name)
+                
+                if bt_setup_status['success']:
+                    logger.info("System-level Bluetooth setup successful")
+                else:
+                    logger.warning(f"System-level Bluetooth setup issues: {bt_setup_status}")
+                
                 # Make device discoverable on startup if configured
                 if bt_config['discoverable_on_startup']:
                     timeout = bt_config['discoverable_timeout']
-                    bluetooth_manager.set_discoverable(True, timeout=timeout)
+                    bluetooth_manager.make_discoverable(timeout=timeout)
                     logger.info(f"Bluetooth set to discoverable mode ({timeout} seconds)")
+                    
+                    # For better visibility, also try to make it always discoverable at system level
+                    logger.info("Setting Bluetooth to always discoverable at system level")
+                    subprocess.run(['sudo', 'hciconfig', 'hci0', 'piscan'], check=False)
                 
                 # Auto-start tethering if configured
                 if bt_config['tethering']['auto_start']:
@@ -1080,6 +1190,23 @@ if __name__ == '__main__':
     automation_thread.start()
     logger.info("Rule-based automation thread started")
     
+    # Register signal handlers for graceful shutdown
+    import signal
+    
+    def signal_handler(sig, frame):
+        logger.info(f"\nReceived signal {sig}, shutting down...")
+        mark_device_offline()
+        actuator_controller.cleanup()
+        if ser:
+            ser.close()
+        logger.info("Shutdown complete")
+        import sys
+        sys.exit(0)
+    
+    # Register handlers for SIGINT (Ctrl+C) and SIGTERM
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
         # Start Flask server with configured settings
         api_config = config.get_api_config()
@@ -1091,6 +1218,7 @@ if __name__ == '__main__':
         )
     except KeyboardInterrupt:
         logger.info("\nShutting down...")
+        mark_device_offline()
     finally:
         actuator_controller.cleanup()
         if ser:
