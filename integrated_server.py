@@ -13,16 +13,22 @@ from datetime import datetime
 from collections import deque
 import logging
 import os
+import serial
 import socket
+import subprocess
 from dotenv import load_dotenv
 from rule_based_controller import RuleBasedController
 from data_logger import DataLogger
 from src.utils.bluetooth_manager import BluetoothManager
 from src.utils.bluetooth_tethering import BluetoothTethering
 from src.utils.bluetooth_setup import setup_bluetooth
+from src.utils.bluetooth_agent import start_bluetooth_agent, stop_bluetooth_agent, get_agent_manager
+from src.utils.ble_advertiser import start_ble_advertising
+from src.utils.bluetooth_serial_wifi import start_bluetooth_serial_wifi_provisioning
 from src.utils.config import Config
 from src.backend_client import BackendClient
 from src.firebase_client import FirebaseClient
+from src.discovery.mdns_service import MDNSService
 
 try:
     import RPi.GPIO as GPIO
@@ -31,6 +37,18 @@ except ImportError:
     GPIO_AVAILABLE = False
     print("WARNING: RPi.GPIO not available, running in simulation mode")
 
+
+def check_internet_connectivity():
+    """Check if device has internet connectivity"""
+    try:
+        # Try to connect to Google DNS
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2)
+        s.connect(("8.8.8.8", 53))
+        s.close()
+        return True
+    except:
+        return False
 
 def get_ip_address():
     """Get the device's IP address"""
@@ -228,10 +246,10 @@ try:
         timeout=backend_timeout,
         mock_mode=not backend_api_url.startswith('http')
     )
-    logger.info(f"✅ Backend client initialized: {backend_api_url}")
-    logger.info(f"✅ Using device ID: {device_id}")
+    logger.info(f"Backend client initialized: {backend_api_url}")
+    logger.info(f"Using device ID: {device_id}")
 except Exception as e:
-    logger.error(f"❌ Failed to initialize backend client: {e}")
+    logger.error(f"Failed to initialize backend client: {e}")
 
 # Initialize Firebase Client
 firebase_client = None
@@ -320,9 +338,11 @@ def init_serial():
 
 def parse_sensor_line(line):
     """Parse sensor data from Arduino
-    Format: SENSOR,timestamp,co2,temperature,humidity,mode,alert
+    Format 1: SENSOR,timestamp,co2,temperature,humidity,mode,alert
+    Format 2: T:23.5,H:65.2,C:450.0,M:f (simpler format)
     """
     try:
+        # Try format 1: SENSOR,timestamp,co2,temperature,humidity,mode,alert
         parts = line.split(',')
         if len(parts) >= 7 and parts[0] == 'SENSOR':
             return {
@@ -333,6 +353,30 @@ def parse_sensor_line(line):
                 'alert': parts[6] == '1',
                 'timestamp': datetime.now().isoformat()
             }
+        
+        # Try format 2: T:23.5,H:65.2,C:450.0,M:f
+        if 'T:' in line and 'H:' in line and 'C:' in line:
+            data = {}
+            for part in parts:
+                if ':' in part:
+                    key, value = part.split(':')
+                    if key == 'T':
+                        data['temperature'] = float(value)
+                    elif key == 'H':
+                        data['humidity'] = float(value)
+                    elif key == 'C':
+                        data['co2'] = int(float(value))
+                    elif key == 'M':
+                        data['mode'] = value.strip()
+            
+            if 'temperature' in data and 'humidity' in data and 'co2' in data:
+                data['alert'] = False
+                data['timestamp'] = datetime.now().isoformat()
+                if 'mode' not in data:
+                    data['mode'] = 's'
+                logger.info(f"Parsed sensor data: T={data['temperature']}°C, H={data['humidity']}%, CO2={data['co2']}ppm, Mode={data['mode']}")
+                return data
+                
     except Exception as e:
         logger.error(f"Error parsing sensor data: {e}")
     return None
@@ -390,6 +434,16 @@ def read_sensor_data():
 def sync_sensor_data(data):
     """Sync sensor data to Backend and Firebase"""
     try:
+        # Check internet connectivity first
+        if not check_internet_connectivity():
+            logger.debug("No internet connection - skipping sensor data sync")
+            return
+        
+        # Check if device is active before sending data
+        if backend_client and not backend_client.is_device_active():
+            logger.debug("Device is turned OFF - skipping sensor data sync")
+            return
+        
         # Sync to Backend
         if backend_client:
             threading.Thread(
@@ -415,6 +469,11 @@ def sync_device_status(status='ONLINE'):
         status: Device status to set (default: 'ONLINE')
     """
     try:
+        # Check internet connectivity first
+        if not check_internet_connectivity():
+            logger.debug("No internet connection - skipping device status sync")
+            return
+        
         # Only include fields that are supported by the Prisma schema
         # Format the timestamp in a way that's compatible with the backend
         # Use UTC time to avoid timezone issues
@@ -891,6 +950,126 @@ def get_bluetooth_status():
         }), 500
 
 
+# ========== WiFi Provisioning API ==========
+
+@app.route('/api/wifi/scan', methods=['GET'])
+def wifi_scan():
+    """Scan for available WiFi networks"""
+    try:
+        from src.utils.wifi_provisioning import get_wifi_provisioning
+        
+        wifi = get_wifi_provisioning()
+        networks = wifi.scan_wifi_networks()
+        
+        logger.info(f"WiFi scan completed: {len(networks)} networks found")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'networks': networks,
+                'count': len(networks)
+            }
+        })
+    except Exception as e:
+        logger.error(f"ERROR: WiFi scan failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/wifi/connect', methods=['POST'])
+def wifi_connect():
+    """Connect to a WiFi network"""
+    try:
+        from src.utils.wifi_provisioning import get_wifi_provisioning
+        
+        data = request.get_json()
+        ssid = data.get('ssid')
+        password = data.get('password')
+        
+        if not ssid:
+            return jsonify({
+                'success': False,
+                'error': 'SSID is required'
+            }), 400
+        
+        logger.info(f"Attempting to connect to WiFi: {ssid}")
+        
+        wifi = get_wifi_provisioning()
+        success = wifi.connect_to_wifi(ssid, password)
+        
+        if success:
+            # Save credentials for auto-connect
+            wifi.save_credentials(ssid, password)
+            
+            # Get IP address
+            ip_address = wifi.get_ip_address()
+            
+            logger.info(f"WiFi connected successfully: {ssid}")
+            logger.info(f"IP Address: {ip_address}")
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'ssid': ssid,
+                    'ip_address': ip_address,
+                    'message': 'WiFi connected successfully. Device will now be accessible online.'
+                }
+            })
+        else:
+            logger.error(f"Failed to connect to WiFi: {ssid}")
+            return jsonify({
+                'success': False,
+                'error': 'Failed to connect to WiFi network'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"ERROR: WiFi connection failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/wifi/status', methods=['GET'])
+def wifi_status():
+    """Get current WiFi connection status"""
+    try:
+        from src.utils.wifi_provisioning import get_wifi_provisioning
+        
+        wifi = get_wifi_provisioning()
+        connection = wifi.get_current_connection()
+        ip_address = wifi.get_ip_address()
+        
+        if connection:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'connected': True,
+                    'ssid': connection['ssid'],
+                    'signal': connection['signal'],
+                    'rate': connection['rate'],
+                    'ip_address': ip_address
+                }
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'connected': False,
+                    'message': 'Not connected to WiFi'
+                }
+            })
+            
+    except Exception as e:
+        logger.error(f"ERROR: Failed to get WiFi status: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/bluetooth/diagnostics', methods=['GET'])
 def bluetooth_diagnostics():
     """Run Bluetooth diagnostics"""
@@ -1033,7 +1212,8 @@ def health_check():
             'serialConnected': ser is not None and ser.is_open if ser else False,
             'gpioAvailable': GPIO_AVAILABLE,
             'automationEnabled': automation_controller.is_enabled(),
-            'bluetoothAvailable': bluetooth_manager.is_available(),
+            # 'bluetoothAvailable': bluetooth_manager.is_available(),
+            'bluetoothAvailable': bt_config['enabled'],
             'timestamp': datetime.now().isoformat()
         }
     })
@@ -1051,8 +1231,19 @@ if __name__ == '__main__':
     # Connect to Backend and Firebase
     logger.info("Connecting to Backend and Firebase...")
     
-    # Look up device in backend instead of registering
-    if backend_client:
+    # Check network connectivity first
+    has_network = False
+    try:
+        import socket
+        socket.create_connection(("8.8.8.8", 53), timeout=3)
+        has_network = True
+        logger.info("Network connectivity detected")
+    except OSError:
+        logger.warning("No network connectivity - running in OFFLINE mode")
+        logger.info("Device will operate with Bluetooth only until WiFi is configured")
+    
+    # Look up device in backend only if we have network
+    if backend_client and has_network:
         try:
             logger.info("Looking up device in backend...")
             if backend_client.lookup_device():
@@ -1064,8 +1255,6 @@ if __name__ == '__main__':
                     DEVICE_ID = backend_client.device_id
                 
                 # Update device status to online
-                # Format the timestamp in a way that's compatible with the backend
-                # Use UTC time to avoid timezone issues
                 current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
                 status_data = {
                     'status': 'ONLINE',
@@ -1084,14 +1273,15 @@ if __name__ == '__main__':
                 except Exception as e:
                     logger.error(f"Error updating device status: {e}")
             else:
-                logger.error("ERROR: Device not registered in backend. Please register this device in the Admin Dashboard first.")
-                logger.info("Continuing with limited functionality. Some features may not work properly.")
-                # You could exit here if you want to prevent operation without backend registration
-                # import sys
-                # sys.exit(1)  # Uncomment to exit if device not registered
+                logger.warning("Device not found in backend - will register when WiFi is configured")
+                logger.info("Continuing in OFFLINE mode with Bluetooth provisioning")
                 
         except Exception as e:
-            logger.error(f"Backend lookup error: {e}")
+            logger.warning(f"Backend lookup failed: {e}")
+            logger.info("Continuing in OFFLINE mode - device can still be configured via Bluetooth")
+    elif not has_network:
+        logger.info("BLUETOOTH PROVISIONING MODE")
+        logger.info("Waiting for mobile app to connect and configure WiFi...")
     
     # Connect to Firebase
     if firebase_client:
@@ -1125,11 +1315,21 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error(f"Firebase connection error: {e}")
     
-    # Start periodic status sync (every 10 minutes)
+    # Start periodic status sync and refresh (every 10 minutes)
     def periodic_status_sync():
         while True:
             try:
-                sync_device_status()
+                # Check internet connectivity first
+                if check_internet_connectivity():
+                    # Refresh device status from backend to check if turned off in app
+                    if backend_client:
+                        backend_client.refresh_device_status()
+                    
+                    # Sync device status to backend
+                    sync_device_status()
+                else:
+                    logger.debug("No internet - skipping periodic status sync")
+                
                 time.sleep(600)  # 10 minutes
             except Exception as e:
                 logger.error(f"Error in periodic status sync: {e}")
@@ -1137,42 +1337,93 @@ if __name__ == '__main__':
     
     status_sync_thread = threading.Thread(target=periodic_status_sync, daemon=True)
     status_sync_thread.start()
-    logger.info("Periodic status sync started (every 10 minutes)")
+    logger.info("Periodic status sync and refresh started (every 10 minutes)")
     
     # Initialize Bluetooth (if enabled in config)
     bt_config = config.get_bluetooth_config()
     if bt_config['enabled']:
-        try:
-            if bluetooth_manager.is_available():
+
                 logger.info("Bluetooth is available")
                 
                 # Perform system-level Bluetooth setup
-                logger.info(f"Setting up Bluetooth with device name: {bluetooth_device_name}")
-                bt_setup_status = setup_bluetooth(bluetooth_device_name)
+                # logger.info(f"Setting up Bluetooth with device name: {bluetooth_device_name}")
+                # bt_setup_status = setup_bluetooth(bluetooth_device_name)
                 
-                if bt_setup_status['success']:
-                    logger.info("System-level Bluetooth setup successful")
-                else:
-                    logger.warning(f"System-level Bluetooth setup issues: {bt_setup_status}")
+                # if bt_setup_status['success']:
+                #     logger.info("System-level Bluetooth setup successful")
+                # else:
+                #     logger.warning(f"System-level Bluetooth setup issues: {bt_setup_status}")
                 
                 # Make device discoverable on startup if configured
                 if bt_config['discoverable_on_startup']:
-                    timeout = bt_config['discoverable_timeout']
-                    bluetooth_manager.make_discoverable(timeout=timeout)
-                    logger.info(f"Bluetooth set to discoverable mode ({timeout} seconds)")
+                    # Start the persistent D-Bus Bluetooth agent
+                    # This is the CORRECT way to enable "Just Works" pairing
+                    # The agent runs continuously and stays registered with bluez
+                    try:
+                        logger.info("Starting persistent Bluetooth agent for 'Just Works' pairing...")
+                        
+                        if start_bluetooth_agent(bluetooth_device_name):
+                            logger.info("Persistent Bluetooth agent started successfully")
+                            logger.info("Device is now discoverable and pairable with automatic pairing")
+                            logger.info("Agent will remain active for the lifetime of this server")
+                            
+                            # Start BLE advertising so device is visible in BLE scans
+                            logger.info("Starting BLE advertising...")
+                            try:
+                                ble_advertiser = start_ble_advertising(bluetooth_device_name)
+                                logger.info("BLE advertising started - device should be visible in BLE scans")
+                                logger.info("Mobile apps using BLE (like Flutter Blue Plus) can now find this device")
+                            except Exception as ble_error:
+                                logger.error(f"Failed to start BLE advertising: {ble_error}")
+                                logger.warning("Device will only be visible in Classic Bluetooth, not BLE scans")
+                            
+                            # Start Bluetooth Serial WiFi provisioning (RFCOMM - no network needed!)
+                            logger.info("Starting Bluetooth Serial WiFi provisioning...")
+                            try:
+                                if start_bluetooth_serial_wifi_provisioning():
+                                    logger.info("Bluetooth Serial WiFi provisioning started successfully")
+                                    logger.info("Mobile app can send WiFi credentials via Bluetooth Serial")
+                                    logger.info("No network layer required - works offline!")
+                                else:
+                                    logger.warning("Failed to start Bluetooth Serial WiFi provisioning")
+                                    logger.warning("WiFi provisioning will not work")
+                                    logger.info("Install PyBluez: sudo pip3 install pybluez")
+                            except Exception as prov_error:
+                                logger.error(f"Error starting Bluetooth Serial WiFi provisioning: {prov_error}")
+                                logger.warning("WiFi provisioning will not be available")
+                        else:
+                            logger.error("Failed to start Bluetooth agent")
+                            logger.error("Pairing will not work until the agent is running")
+                    
+                    except Exception as e:
+                        logger.error(f"Error starting Bluetooth agent: {e}")
+                        import traceback
+                        traceback.print_exc()
                     
                     # For better visibility, also try to make it always discoverable at system level
-                    logger.info("Setting Bluetooth to always discoverable at system level")
-                    subprocess.run(['sudo', 'hciconfig', 'hci0', 'piscan'], check=False)
+                    # logger.info("Setting Bluetooth to always discoverable at system level")
+                    # try:
+                    #     subprocess.run(['sudo', 'hciconfig', 'hci0', 'piscan'], check=False)
+                    #     # Set device class to 0x000104 (Computer + Peripheral)
+                    #     subprocess.run(['sudo', 'hciconfig', 'hci0', 'class', '0x000104'], check=False)
+                    #     logger.info("Bluetooth set to always discoverable with Computer+Peripheral class")
+                    # except Exception as e:
+                    #     logger.error(f"Error setting Bluetooth discoverable: {e}")
                 
-                # Auto-start tethering if configured
-                if bt_config['tethering']['auto_start']:
-                    logger.info("Auto-starting Bluetooth tethering...")
-                    bluetooth_tethering.start_tethering()
-            else:
-                logger.warning("WARNING: Bluetooth not available on this system")
-        except Exception as e:
-            logger.error(f"ERROR: Failed to initialize Bluetooth: {e}")
+                # Auto-start tethering for WiFi provisioning
+                # This allows the mobile app to access the HTTP API over Bluetooth
+                logger.info("Starting Bluetooth tethering for WiFi provisioning...")
+                try:
+                    if bluetooth_tethering.start_tethering():
+                        logger.info("Bluetooth tethering started successfully")
+                        logger.info("Device accessible at: http://192.168.44.1:5000")
+                        logger.info("Mobile app can now configure WiFi via Bluetooth")
+                    else:
+                        logger.warning("Failed to start Bluetooth tethering")
+                        logger.warning("WiFi provisioning over Bluetooth may not work")
+                except Exception as tether_error:
+                    logger.error(f"Error starting Bluetooth tethering: {tether_error}")
+                    logger.warning("WiFi provisioning will require manual IP entry")
     else:
         logger.info("Bluetooth is disabled in configuration")
     
@@ -1196,6 +1447,22 @@ if __name__ == '__main__':
     def signal_handler(sig, frame):
         logger.info(f"\nReceived signal {sig}, shutting down...")
         mark_device_offline()
+        
+        # Stop mDNS service
+        if mdns_service:
+            try:
+                logger.info("Stopping mDNS service...")
+                mdns_service.stop()
+            except Exception as e:
+                logger.error(f"Error stopping mDNS service: {e}")
+        
+        # Stop Bluetooth agent
+        try:
+            logger.info("Stopping Bluetooth agent...")
+            stop_bluetooth_agent()
+        except Exception as e:
+            logger.error(f"Error stopping Bluetooth agent: {e}")
+        
         actuator_controller.cleanup()
         if ser:
             ser.close()
@@ -1206,6 +1473,31 @@ if __name__ == '__main__':
     # Register handlers for SIGINT (Ctrl+C) and SIGTERM
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Start mDNS service for local network discovery
+    mdns_service = None
+    try:
+        logger.info("Starting mDNS service for local network discovery...")
+        # Get API config and ensure port is an integer
+        api_config = config.get_api_config()
+        mdns_port = int(api_config.get('port', 5000))
+        
+        mdns_service = MDNSService(
+            device_id=DEVICE_ID,
+            service_name=DEVICE_NAME,
+            service_type='_mash-iot._tcp.local.',
+            port=mdns_port
+        )
+        if mdns_service.start():
+            logger.info(f"mDNS service started - Device discoverable as: {DEVICE_NAME}")
+            logger.info(f"Service type: _mash-iot._tcp.local. on port {mdns_port}")
+            logger.info("Mobile apps can now discover this device on local network")
+        else:
+            logger.warning("Failed to start mDNS service - device will not be auto-discoverable")
+            logger.info("You can still connect using Manual IP in the mobile app")
+    except Exception as e:
+        logger.error(f"Error starting mDNS service: {e}")
+        logger.info("Device will not be auto-discoverable, use Manual IP to connect")
     
     try:
         # Start Flask server with configured settings
@@ -1219,6 +1511,13 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         logger.info("\nShutting down...")
         mark_device_offline()
+        
+        # Stop Bluetooth agent
+        try:
+            logger.info("Stopping Bluetooth agent...")
+            stop_bluetooth_agent()
+        except Exception as e:
+            logger.error(f"Error stopping Bluetooth agent: {e}")
     finally:
         actuator_controller.cleanup()
         if ser:

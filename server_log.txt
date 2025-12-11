@@ -1,0 +1,67 @@
+(venv) mash@MASH-CHAMBER:~/MASH-IoT-Device $ python integrated_server.py 
+2025-11-12 11:20:12,403 - INFO - GPIO initialized - actuators ready
+2025-11-12 11:20:12,413 - INFO - Rule-Based Controller initialized with mathematical thresholds
+2025-11-12 11:20:12,441 - INFO - Database initialized: /home/mash/MASH-IoT-Device/data/device_logs.db
+2025-11-12 11:20:12,443 - INFO - Initializing Bluetooth with device name: MASH-IoT-Device
+2025-11-12 11:20:12,445 - INFO - Device ID from config: 'MASH-A1-CAL25-D5A91F'
+2025-11-12 11:20:12,446 - INFO - DEVICE_ID variable: 'MASH-A1-CAL25-D5A91F'
+2025-11-12 11:20:12,448 - INFO - Backend client initialized with device ID: 'MASH-A1-CAL25-D5A91F'
+2025-11-12 11:20:12,456 - INFO - API URL: http://192.168.1.58:3000/api/v1
+2025-11-12 11:20:12,458 - INFO - ✅ Backend client initialized: http://192.168.1.58:3000/api/v1
+2025-11-12 11:20:12,465 - INFO - ✅ Using device ID: MASH-A1-CAL25-D5A91F
+2025-11-12 11:20:12,466 - INFO - Authenticating with Firebase...
+2025-11-12 11:20:13,185 - ERROR - Firebase authentication failed: 404
+2025-11-12 11:20:13,186 - INFO - ✅ Firebase client initialized: https://mash-5b627-default-rtdb.firebaseio.com
+2025-11-12 11:20:13,364 - INFO - Starting MASH IoT Device Server
+2025-11-12 11:20:13,365 - INFO - Device ID: MASH-A1-CAL25-D5A91F
+2025-11-12 11:20:13,366 - INFO - Device Name: MASH Chamber #1
+2025-11-12 11:20:13,366 - INFO - Configuration loaded from: config/device_config.yaml
+2025-11-12 11:20:13,372 - INFO - Connecting to Backend and Firebase...
+2025-11-12 11:20:13,373 - INFO - Looking up device in backend...
+2025-11-12 11:20:13,373 - INFO - Looking up device in backend: MASH-A1-CAL25-D5A91F
+2025-11-12 11:20:13,375 - INFO - API URL: http://192.168.1.58:3000/api/v1/iot/devices/serial/MASH-A1-CAL25-D5A91F
+2025-11-12 11:20:13,376 - INFO - Request headers: {'User-Agent': 'MASH-IoT-Device/MASH-A1-CAL25-D5A91F', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+2025-11-12 11:20:23,293 - INFO - Response status code: 200
+2025-11-12 11:20:23,293 - INFO - Response data structure: dict_keys(['success', 'statusCode', 'data', 'timestamp', 'path', 'correlationId'])
+2025-11-12 11:20:23,294 - INFO - Device data keys: dict_keys(['success', 'message', 'data'])
+2025-11-12 11:20:23,294 - WARNING - Device found but no serial number returned, keeping original: MASH-A1-CAL25-D5A91F
+2Main PID: 2947 (bluetoothd)
+2025-11-12 11:20:23,295 - INFO - Device found in backend: {'success': True, 'message': 'Device found', 'data': {'id': '00000000-0000-4000-a000-000000000001', 'name': 'MASH ZenGarden', 'type': 'MUSHROOM_CHAMBER', 'serialNumber': 'MASH-A1-CAL25-D5A91F', 'status': 'OFFLINE', 'location': 'ZenThesis', 'description': None, 'firmware': '1.0.0', 'ipAddress': '192.168.1.51', 'macAddress': 'b8:27:eb:37:04:8e', 'lastSeen': '2025-11-12T03:16:10.045Z', 'isActive': True, 'createdAt': '2025-11-11T17:07:20.616Z', 'updatedAt': '2025-11-12T03:16:10.267Z'}}
+2025-11-12 11:20:23,295 - INFO - Device found in backend successfully
+/home/mash/MASH-IoT-Device/integrated_server.py:1072: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+2025-11-12 11:20:23,306 - INFO - Using timestamp: 2025-11-12T03:20:23.304949Z
+2025-11-12 11:20:23,307 - INFO - Using timestamp: 2025-11-12T03:20:23.307420Z
+2025-11-12 11:20:23,307 - INFO - Sending payload: {'status': 'ONLINE', 'lastSeen': '2025-11-12T03:20:23.304949Z', 'firmware': '1.0.0', 'ipAddress': '192.168.1.51', 'macAddress': 'b8:27:eb:37:04:8e'}
+2025-11-12 11:20:23,308 - INFO - Updating device status to ONLINE for MASH-A1-CAL25-D5A91F
+2025-11-12 11:20:30,936 - INFO - Device status updated successfully
+2025-11-12 11:20:30,937 - INFO - Device status updated to ONLINE
+2025-11-12 11:20:30,937 - INFO - Authenticating with Firebase...
+2025-11-12 11:20:31,155 - ERROR - Firebase authentication failed: 404
+2025-11-12 11:20:31,157 - WARNING - Failed to connect to Firebase
+/home/mash/MASH-IoT-Device/integrated_server.py:423: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  current_time = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+2025-11-12 11:20:31,160 - INFO - Periodic status sync started (every 10 minutes)
+2025-11-12 11:20:31,164 - INFO - Using timestamp: 2025-11-12T03:20:31.163918Z
+2025-11-12 11:20:31,166 - INFO - Bluetooth is available
+2025-11-12 11:20:31,171 - INFO - Using timestamp: 2025-11-12T03:20:31.171157Z
+2025-11-12 11:20:31,174 - INFO - Setting Bluetooth agent for automatic 'Just Works' pairing...
+2025-11-12 11:20:31,173 - WARNING - Not connected to Firebase
+2025-11-12 11:20:31,175 - INFO - Updating device status to ONLINE for MASH-A1-CAL25-D5A91F
+2025-11-12 11:20:31,419 - INFO - Bluetooth agent set, device is now discoverable and pairable.
+2025-11-12 11:20:31,422 - INFO - Attempting to connect to Arduino on /dev/ttyUSB0...
+2025-11-12 11:20:33,427 - INFO - Serial connection established on /dev/ttyUSB0
+2Player: Hi, I'm trying to figure out the name of a character in a movie. She's a robot, or maybe a cyborg, and she has this really cool, sleek, white body. I think she might have been in a movie in the last 10 years or so, and she was a big part of the plot.
+2025-11-12 11:20:33,429 - INFO - Starting sensor data reader...
+2025-11-12 11:20:33,429 - INFO - Sensor data reader started
+2025-11-12 11:20:33,432 - INFO - Starting rule-based automation loop...
+2025-11-12 11:20:33,433 - INFO - Rule-based automation thread started
+2025-11-12 11:20:33,434 - INFO - Starting HTTP server on 0.0.0.0:5000
+* Serving Flask app 'integrated_server'
+* Debug mode: off
+2025-11-12 11:20:33,553 - INFO - WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+* Running on all addresses (0.0.0.0)
+* Running on http://127.0.0.1:5000
+* Running on http://192.168.1.51:5000
+2025-11-12 11:20:33,553 - INFO - Press CTRL+C to quit
+2025-11-12 11:20:38,721 - INFO - Device status updated successfully

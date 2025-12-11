@@ -1,0 +1,29 @@
+# MASH Touchscreen UI - Python Dependencies
+# For Raspberry Pi 3 with 7" touchscreen (800x480)
+
+# Core UI Framework
+kivy==2.3.0
+kivy-garden==0.1.5
+
+# Kivy dependencies
+Kivy-Garden==0.1.5
+pygments>=2.14.0
+docutils>=0.19
+pillow>=10.0.0
+
+# Network and API
+requests>=2.31.0
+python-socketio[client]>=5.10.0
+websocket-client>=1.6.4
+paho-mqtt>=1.6.1  # MQTT client for real-time updates
+
+# System utilities
+netifaces>=0.11.0  # Network interface info
+psutil>=5.9.6      # System resource monitoring
+
+# Optional: Camera support (if adding camera feed later)
+# opencv-python-headless>=4.8.0
+
+# Development only (not needed on production RPi3)
+# pytest>=7.4.3
+# pytest-cov>=4.1.0
