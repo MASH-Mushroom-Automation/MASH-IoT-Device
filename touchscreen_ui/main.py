@@ -88,51 +88,23 @@ class MASHApp(App):
         # Create screen manager
         self.screen_manager = ScreenManager(transition=SlideTransition())
         
-        # Add screens (will be implemented in next phase)
-        # For now, add a placeholder welcome screen
-        from kivy.uix.label import Label
-        from kivy.uix.boxlayout import BoxLayout
+        # Import screen classes
+        from screens.dashboard import DashboardScreen
+        from screens.controls import ControlsScreen
+        from screens.settings import SettingsScreen
+        from screens.wifi_setup import WiFiSetupScreen
         
-        welcome_screen = Screen(name='welcome')
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=20)
+        # Add all screens
+        self.screen_manager.add_widget(DashboardScreen(app_instance=self, name='dashboard'))
+        self.screen_manager.add_widget(ControlsScreen(app_instance=self, name='controls'))
+        self.screen_manager.add_widget(SettingsScreen(app_instance=self, name='settings'))
+        self.screen_manager.add_widget(WiFiSetupScreen(app_instance=self, name='wifi_setup'))
         
-        title = Label(
-            text='MASH Touchscreen UI',
-            font_size=config.FONTS['size_title'],
-            size_hint=(1, 0.2)
-        )
-        
-        status_label = Label(
-            text='Initializing...',
-            font_size=config.FONTS['size_body'],
-            size_hint=(1, 0.6)
-        )
-        self.status_label = status_label
-        
-        # Screen info
-        screen_info = config.SCREEN_CONFIGS[config.CURRENT_SCREEN]
-        info = Label(
-            text=(
-                f'Device: {config.DEVICE_NAME}\\n'
-                f'ID: {config.DEVICE_ID}\\n'
-                f'Screen: {screen_info["name"]} ({screen_info["width"]}x{screen_info["height"]})'
-            ),
-            font_size=config.FONTS['size_caption'],
-            size_hint=(1, 0.2)
-        )
-        
-        layout.add_widget(title)
-        layout.add_widget(status_label)
-        layout.add_widget(info)
-        
-        welcome_screen.add_widget(layout)
-        self.screen_manager.add_widget(welcome_screen)
+        # Set default screen
+        self.screen_manager.current = 'dashboard'
         
         # Set background color
         Window.clearcolor = config.COLORS['background']
-        
-        # Schedule initialization check
-        Clock.schedule_once(self.check_backend_connection, 1)
         
         # Schedule periodic updates
         self.sensor_update_callback = Clock.schedule_interval(
@@ -152,30 +124,6 @@ class MASHApp(App):
         
         logger.info("UI built successfully")
         return self.screen_manager
-    
-    def check_backend_connection(self, dt):
-        """Check if Flask backend is reachable"""
-        logger.info("Checking backend connection...")
-        
-        if self.api_client.health_check():
-            logger.info("✅ Backend connection established")
-            self.status_label.text = (
-                "✅ Backend Connected\n\n"
-                "Screens will be implemented in next phase:\n"
-                "• Dashboard (sensor readings)\n"
-                "• Controls (actuator toggles)\n"
-                "• WiFi Setup (network config)\n"
-                "• Settings (system info)\n\n"
-                f"API: {config.API_BASE_URL}"
-            )
-        else:
-            logger.warning("⚠️ Backend not reachable")
-            self.status_label.text = (
-                "⚠️ Backend Not Connected\n\n"
-                "Make sure integrated_server.py is running:\n"
-                "python3 integrated_server.py\n\n"
-                f"Expected at: {config.API_BASE_URL}"
-            )
     
     def update_sensor_data(self, dt):
         """Periodically update sensor data from API"""

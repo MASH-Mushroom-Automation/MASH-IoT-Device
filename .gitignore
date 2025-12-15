@@ -1,2 +1,6 @@
 .env
 *.pyc
+/touchscreen_ui/venv
+/venv
+*.ps1
+requirements-windows.txt

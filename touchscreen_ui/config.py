@@ -104,12 +104,14 @@ COLORS = {
 def get_font_sizes():
     """Get font sizes scaled for current screen"""
     base_sizes = {
+        'size_display': 42,      # Large display numbers
         'size_title': 28,
-        'size_heading': 22,
-        'size_subheading': 18,
+        'size_subtitle': 22,
+        'size_heading': 20,
         'size_body': 16,
         'size_caption': 14,
         'size_small': 12,
+        'size_icon': 36,         # Icon/emoji size
     }
     
     # Scale fonts based on screen size

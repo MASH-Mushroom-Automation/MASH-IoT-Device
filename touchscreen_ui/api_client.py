@@ -249,6 +249,42 @@ class MASHApiClient:
         """
         return self._request('GET', '/wifi/status')
     
+    def get_wifi_status(self) -> Optional[Dict]:
+        """
+        Get current WiFi connection status (alias for wifi_status)
+        
+        Returns:
+            {
+                'connected': bool,
+                'ssid': str,
+                'ip_address': str,
+                'signal_strength': int
+            }
+        """
+        return self.wifi_status()
+    
+    def scan_wifi(self) -> Optional[List[Dict]]:
+        """
+        Scan for available WiFi networks (alias for wifi_scan)
+        
+        Returns:
+            List of WiFi networks with SSID, signal strength, security
+        """
+        return self.wifi_scan()
+    
+    def connect_wifi(self, ssid: str, password: str) -> Optional[Dict]:
+        """
+        Connect to WiFi network (alias for wifi_connect)
+        
+        Args:
+            ssid: Network SSID
+            password: Network password
+            
+        Returns:
+            Connection status
+        """
+        return self.wifi_connect(ssid, password)
+    
     # ========== Data Logs ==========
     
     def get_sensor_logs(self, hours: int = 24, limit: int = 100) -> Optional[List[Dict]]:
