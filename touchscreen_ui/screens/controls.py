@@ -53,9 +53,9 @@ class ControlsScreen(Screen):
         auto_layout = BoxLayout(
             orientation='horizontal',
             size_hint=(1, None),
-            height=dp(60) * config.SCALE_FACTOR,
-            spacing=dp(10) * config.SCALE_FACTOR,
-            padding=[0, dp(10) * config.SCALE_FACTOR]
+            height=dp(70) * config.SCALE_FACTOR,
+            spacing=dp(15) * config.SCALE_FACTOR,
+            padding=[dp(10) * config.SCALE_FACTOR, dp(10) * config.SCALE_FACTOR, dp(10) * config.SCALE_FACTOR, dp(10) * config.SCALE_FACTOR]
         )
         
         auto_label = Label(
@@ -80,13 +80,34 @@ class ControlsScreen(Screen):
         
         content.add_widget(auto_layout)
         
+        # Add spacer
+        content.add_widget(BoxLayout(size_hint=(1, None), height=dp(15) * config.SCALE_FACTOR))
+        
+        # Actuator controls title
+        controls_title = Label(
+            text='Actuator Controls',
+            font_size=config.FONTS['size_heading'],
+            size_hint=(1, None),
+            height=dp(35) * config.SCALE_FACTOR,
+            color=config.COLORS['text_primary'],
+            bold=True,
+            halign='left',
+            valign='middle'
+        )
+        controls_title.bind(size=controls_title.setter('text_size'))
+        content.add_widget(controls_title)
+        
+        # Add spacer
+        content.add_widget(BoxLayout(size_hint=(1, None), height=dp(10) * config.SCALE_FACTOR))
+        
         # Actuator controls grid
         controls_grid = GridLayout(
             cols=2,
-            spacing=dp(15) * config.SCALE_FACTOR,
-            size_hint=(1, None),
-            height=dp(280) * config.SCALE_FACTOR,
-            padding=[0, dp(10) * config.SCALE_FACTOR]
+            spacing=dp(20) * config.SCALE_FACTOR,
+            size_hint=(1, 1),
+            padding=[dp(5) * config.SCALE_FACTOR, 0],
+            row_default_height=dp(140) * config.SCALE_FACTOR,
+            row_force_default=True
         )
         
         # Blower Fan toggle

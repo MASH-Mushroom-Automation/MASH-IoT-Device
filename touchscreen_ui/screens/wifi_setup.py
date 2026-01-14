@@ -96,7 +96,13 @@ class WiFiSetupScreen(Screen):
         scroll.add_widget(self.network_list)
         content.add_widget(scroll)
         
-        # Connection form
+        # Connection form (top 50% for OSK compatibility)
+        form_container = BoxLayout(
+            orientation='vertical',
+            size_hint=(1, 0.3),
+            spacing=dp(10) * config.SCALE_FACTOR
+        )
+        
         form_label = Label(
             text='Connect to Network:',
             font_size=config.FONTS['size_subtitle'],
@@ -108,7 +114,7 @@ class WiFiSetupScreen(Screen):
             valign='middle'
         )
         form_label.bind(size=form_label.setter('text_size'))
-        content.add_widget(form_label)
+        form_container.add_widget(form_label)
         
         # SSID input
         self.ssid_input = TextInput(
@@ -118,9 +124,10 @@ class WiFiSetupScreen(Screen):
             height=dp(50) * config.SCALE_FACTOR,
             multiline=False,
             background_color=config.COLORS['surface'],
-            foreground_color=config.COLORS['text_primary']
+            foreground_color=config.COLORS['text_primary'],
+            padding=[dp(15) * config.SCALE_FACTOR, dp(12) * config.SCALE_FACTOR]
         )
-        content.add_widget(self.ssid_input)
+        form_container.add_widget(self.ssid_input)
         
         # Password input
         self.password_input = TextInput(
@@ -131,9 +138,20 @@ class WiFiSetupScreen(Screen):
             multiline=False,
             password=True,
             background_color=config.COLORS['surface'],
-            foreground_color=config.COLORS['text_primary']
+            foreground_color=config.COLORS['text_primary'],
+            padding=[dp(15) * config.SCALE_FACTOR, dp(12) * config.SCALE_FACTOR]
         )
-        content.add_widget(self.password_input)
+        form_container.add_widget(self.password_input)
+        
+        content.add_widget(form_container)
+        
+        # Button container
+        button_container = BoxLayout(
+            orientation='vertical',
+            size_hint=(1, None),
+            height=dp(150) * config.SCALE_FACTOR,
+            spacing=dp(10) * config.SCALE_FACTOR
+        )
         
         # Connect button
         connect_btn = Button(
@@ -144,7 +162,7 @@ class WiFiSetupScreen(Screen):
             background_color=config.COLORS['success'],
             on_press=self.connect_to_network
         )
-        content.add_widget(connect_btn)
+        button_container.add_widget(connect_btn)
         
         # Status message
         self.message_label = Label(
@@ -152,9 +170,12 @@ class WiFiSetupScreen(Screen):
             font_size=config.FONTS['size_caption'],
             color=config.COLORS['text_secondary'],
             size_hint=(1, None),
-            height=dp(30) * config.SCALE_FACTOR
+            height=dp(30) * config.SCALE_FACTOR,
+            halign='center',
+            valign='middle'
         )
-        content.add_widget(self.message_label)
+        self.message_label.bind(size=self.message_label.setter('text_size'))
+        button_container.add_widget(self.message_label)
         
         # Back button
         back_btn = Button(
@@ -165,7 +186,9 @@ class WiFiSetupScreen(Screen):
             background_color=config.COLORS['surface_light'],
             on_press=lambda x: self.go_back()
         )
-        content.add_widget(back_btn)
+        button_container.add_widget(back_btn)
+        
+        content.add_widget(button_container)
         
         # Add content to main layout
         main_layout.add_widget(content)

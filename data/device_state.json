@@ -1,6 +1,8 @@
 {
-  "isFirstTimeLogin": true,
-  "isTutorialDone": false,
-  "deviceConfigured": false,
-  "lastBootTime": null
+  "isFirstTimeLogin": false,
+  "isTutorialDone": true,
+  "deviceConfigured": true,
+  "lastBootTime": null,
+  "wifiConfigured": true,
+  "appPaired": true
 }

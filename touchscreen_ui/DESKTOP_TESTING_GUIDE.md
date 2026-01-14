@@ -91,7 +91,7 @@ Check that `.env` file exists in `touchscreen_ui/` folder:
 
 ```env
 DEVICE_ID=MASH-A1-CAL25-D5A91F
-DEVICE_NAME=MASH Chamber Test
+DEVICE_NAME=MASH Chamber
 SCREEN_SIZE=7
 API_BASE_URL=http://127.0.0.1:5000/api
 DEBUG=true

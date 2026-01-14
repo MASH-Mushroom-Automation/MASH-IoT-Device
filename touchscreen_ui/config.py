@@ -4,6 +4,10 @@ MASH Touchscreen UI - Configuration
 
 import os
 
+# ========== Demo/Mock Mode ==========
+# Enable mock mode for demo without backend/hardware
+MOCK_MODE = os.getenv('MOCK_MODE', 'false').lower() == 'true'
+
 # ========== Flask Backend API Configuration ==========
 # The touchscreen UI communicates with the existing Flask server
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://127.0.0.1:5000/api')
@@ -134,7 +138,7 @@ TOUCH_RIPPLE_DURATION = 0.3  # Ripple effect duration (seconds)
 
 # ========== Data Update Configuration ==========
 # How often to poll API for sensor data (seconds)
-SENSOR_UPDATE_INTERVAL = 2
+SENSOR_UPDATE_INTERVAL = 5
 
 # How often to update actuator states (seconds)
 ACTUATOR_UPDATE_INTERVAL = 5

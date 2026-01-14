@@ -183,8 +183,8 @@ class SetupWizardScreen(Screen):
             height=dp(50) * config.SCALE_FACTOR,
             font_size=config.FONTS['size_body'],
             background_color=self._hex_to_rgb('#1E1E1E') + (1,),
-            foreground_color=config.COLORS['text_primary'] + (1,),
-            cursor_color=config.COLORS['primary'] + (1,),
+            foreground_color=config.COLORS['text_primary'],
+            cursor_color=config.COLORS['primary'],
             padding=[dp(15) * config.SCALE_FACTOR, dp(12) * config.SCALE_FACTOR]
         )
         top_section.add_widget(self.ssid_input)
@@ -198,8 +198,8 @@ class SetupWizardScreen(Screen):
             height=dp(50) * config.SCALE_FACTOR,
             font_size=config.FONTS['size_body'],
             background_color=self._hex_to_rgb('#1E1E1E') + (1,),
-            foreground_color=config.COLORS['text_primary'] + (1,),
-            cursor_color=config.COLORS['primary'] + (1,),
+            foreground_color=config.COLORS['text_primary'],
+            cursor_color=config.COLORS['primary'],
             padding=[dp(15) * config.SCALE_FACTOR, dp(12) * config.SCALE_FACTOR]
         )
         top_section.add_widget(self.password_input)
@@ -208,7 +208,7 @@ class SetupWizardScreen(Screen):
         self.wifi_status_label = Label(
             text='',
             font_size=config.FONTS['size_small'],
-            color=config.COLORS['warning'] + (1,),
+            color=config.COLORS['warning'],
             size_hint=(1, None),
             height=dp(30) * config.SCALE_FACTOR
         )
@@ -275,7 +275,7 @@ class SetupWizardScreen(Screen):
         
         # Show connecting status
         self.wifi_status_label.text = 'Connecting...'
-        self.wifi_status_label.color = config.COLORS['info'] + (1,)
+        self.wifi_status_label.color = config.COLORS['info']
         
         # Call API to connect
         try:
@@ -283,7 +283,7 @@ class SetupWizardScreen(Screen):
             
             if result and result.get('success'):
                 self.wifi_status_label.text = '✓ Connected successfully!'
-                self.wifi_status_label.color = config.COLORS['success'] + (1,)
+                self.wifi_status_label.color = config.COLORS['success']
                 
                 # Update device state
                 self._update_device_state({'wifiConfigured': True})
@@ -293,11 +293,11 @@ class SetupWizardScreen(Screen):
             else:
                 error_msg = result.get('message', 'Connection failed') if result else 'Connection failed'
                 self.wifi_status_label.text = f'✗ {error_msg}'
-                self.wifi_status_label.color = config.COLORS['error'] + (1,)
+                self.wifi_status_label.color = config.COLORS['error']
                 
         except Exception as e:
             self.wifi_status_label.text = f'✗ Error: {str(e)}'
-            self.wifi_status_label.color = config.COLORS['error'] + (1,)
+            self.wifi_status_label.color = config.COLORS['error']
     
     def _show_step_3(self):
         """Step 3: Mobile App Pairing"""

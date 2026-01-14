@@ -8,6 +8,14 @@ import os
 import sys
 import logging
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print(f"✓ Environment loaded - MOCK_MODE={os.getenv('MOCK_MODE', 'false')}")
+except ImportError:
+    print("⚠ python-dotenv not installed, using system environment only")
+
 # ========== RPi3 GPU Optimization ==========
 # Set environment variables BEFORE importing Kivy for optimal performance
 if not os.getenv('KIVY_WINDOW'):
@@ -67,8 +75,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import API client and MQTT client
-from api_client import get_api_client
-from mqtt_client import get_mqtt_client
+if config.MOCK_MODE:
+    from mock_api_client import MockAPIClient
+    logger.info("=" * 60)
+    logger.info("🎭 MOCK MODE ENABLED - Demo with simulated data")
+    logger.info("=" * 60)
+else:
+    from api_client import get_api_client
+    from mqtt_client import get_mqtt_client
 
 
 class MASHApp(App):
@@ -76,8 +90,14 @@ class MASHApp(App):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.api_client = get_api_client()
-        self.mqtt_client = get_mqtt_client()
+        
+        # Initialize API client (mock or real)
+        if config.MOCK_MODE:
+            self.api_client = MockAPIClient()
+            self.mqtt_client = None  # No MQTT in mock mode
+        else:
+            self.api_client = get_api_client()
+            self.mqtt_client = get_mqtt_client()
         self.screen_manager = None
         
         # Application state
@@ -91,8 +111,8 @@ class MASHApp(App):
         self.actuator_update_callback = None
         self.status_update_callback = None
         
-        # Set up MQTT callbacks
-        if self.mqtt_client.enabled:
+        # Set up MQTT callbacks (only if not in mock mode)
+        if not config.MOCK_MODE and self.mqtt_client and self.mqtt_client.enabled:
             self.mqtt_client.set_on_sensor_data(self._on_mqtt_sensor_data)
             self.mqtt_client.set_on_actuator_update(self._on_mqtt_actuator_update)
             self.mqtt_client.set_on_status_update(self._on_mqtt_status_update)

@@ -65,9 +65,10 @@ class DashboardScreen(Screen):
         # Sensor cards grid
         sensor_grid = GridLayout(
             cols=2 if config.CURRENT_SCREEN == '7' else 1,
-            spacing=dp(15) * config.SCALE_FACTOR,
+            spacing=dp(20) * config.SCALE_FACTOR,
             size_hint=(1, None),
-            height=dp(300) * config.SCALE_FACTOR
+            height=dp(300) * config.SCALE_FACTOR,
+            padding=[dp(5) * config.SCALE_FACTOR, 0]
         )
         
         # CO2 sensor card

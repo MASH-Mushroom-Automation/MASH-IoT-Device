@@ -314,7 +314,7 @@ class AIInsightsScreen(Screen):
         error_label = Label(
             text='⚠ Unable to load AI insights\nCheck API connection',
             font_size=config.FONTS['size_body'],
-            color=config.COLORS['error'] + (1,),
+            color=config.COLORS['error'],
             size_hint=(1, None),
             height=dp(80) * config.SCALE_FACTOR,
             halign='center'
