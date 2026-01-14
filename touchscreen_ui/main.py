@@ -7,6 +7,22 @@ Local interface for Raspberry Pi 3 with 7" touchscreen
 import os
 import sys
 import logging
+
+# ========== RPi3 GPU Optimization ==========
+# Set environment variables BEFORE importing Kivy for optimal performance
+if not os.getenv('KIVY_WINDOW'):
+    # Check if running on Raspberry Pi
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            cpuinfo = f.read()
+            if 'Raspberry Pi' in cpuinfo or 'BCM' in cpuinfo:
+                # Optimize for Broadcom GPU (RPi3)
+                os.environ['KIVY_WINDOW'] = 'egl_rpi'
+                os.environ['KIVY_BCM_DISPMANX_ID'] = '2'
+                print("✓ RPi3 GPU optimization enabled")
+    except:
+        pass
+
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen, SlideTransition
 from kivy.clock import Clock
@@ -85,23 +101,34 @@ class MASHApp(App):
         """Build the application UI"""
         logger.info("Building MASH Touchscreen UI")
         
-        # Create screen manager
-        self.screen_manager = ScreenManager(transition=SlideTransition())
+        # Create screen manager with FadeTransition for better performance
+        from kivy.uix.screenmanager import FadeTransition
+        self.screen_manager = ScreenManager(transition=FadeTransition(duration=0.2))
         
         # Import screen classes
+        from screens.splash import SplashScreen
+        from screens.setup_wizard import SetupWizardScreen
         from screens.dashboard import DashboardScreen
         from screens.controls import ControlsScreen
+        from screens.alerts import AlertsScreen
+        from screens.ai_insights import AIInsightsScreen
+        from screens.help import HelpScreen
         from screens.settings import SettingsScreen
         from screens.wifi_setup import WiFiSetupScreen
         
         # Add all screens
+        self.screen_manager.add_widget(SplashScreen(app_instance=self, name='splash'))
+        self.screen_manager.add_widget(SetupWizardScreen(app_instance=self, name='setup_wizard'))
         self.screen_manager.add_widget(DashboardScreen(app_instance=self, name='dashboard'))
         self.screen_manager.add_widget(ControlsScreen(app_instance=self, name='controls'))
+        self.screen_manager.add_widget(AlertsScreen(app_instance=self, name='alerts'))
+        self.screen_manager.add_widget(AIInsightsScreen(app_instance=self, name='ai_insights'))
+        self.screen_manager.add_widget(HelpScreen(app_instance=self, name='help'))
         self.screen_manager.add_widget(SettingsScreen(app_instance=self, name='settings'))
         self.screen_manager.add_widget(WiFiSetupScreen(app_instance=self, name='wifi_setup'))
         
-        # Set default screen
-        self.screen_manager.current = 'dashboard'
+        # Set splash screen as entry point
+        self.screen_manager.current = 'splash'
         
         # Set background color
         Window.clearcolor = config.COLORS['background']

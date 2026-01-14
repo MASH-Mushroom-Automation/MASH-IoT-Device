@@ -4,3 +4,4 @@
 /venv
 *.ps1
 requirements-windows.txt
+/.history

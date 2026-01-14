@@ -235,6 +235,10 @@ class MASHApiClient:
             'password': password
         })
     
+    def connect_wifi(self, ssid: str, password: str) -> Optional[Dict]:
+        """Alias for wifi_connect for consistency"""
+        return self.wifi_connect(ssid, password)
+    
     def wifi_status(self) -> Optional[Dict]:
         """
         Get current WiFi connection status

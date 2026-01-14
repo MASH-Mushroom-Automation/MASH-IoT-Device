@@ -393,13 +393,36 @@ def read_sensor_data():
             if ser and ser.in_waiting > 0:
                 line = ser.readline().decode('utf-8').strip()
                 
-                # Parse sensor data
+                # Parse sensor data - Format 1: SENSOR,timestamp,co2,temperature,humidity,mode,alert
                 if line.startswith('SENSOR,'):
                     data = parse_sensor_line(line)
                     if data:
                         with data_lock:
                             sensor_data.update(data)
                             current_mode = data['mode']
+                        
+                        # Add to history
+                        READING_HISTORY.append(data)
+                        
+                        # Log to database
+                        data_logger.log_sensor_reading(data)
+                        
+                        # Sync to Backend and Firebase
+                        sync_sensor_data(data)
+                        
+                        logger.debug(f"Sensor data: CO2={data['co2']}ppm, T={data['temperature']}°C, H={data['humidity']}%")
+                
+                # Parse sensor data - Format 2: T:25.5,H:85.2,C:1200
+                elif 'T:' in line and 'H:' in line and 'C:' in line:
+                    data = parse_sensor_line(line)
+                    if data:
+                        with data_lock:
+                            sensor_data.update(data)
+                            # Use stored mode if not in data
+                            if 'mode' in data:
+                                current_mode = data['mode']
+                            else:
+                                data['mode'] = current_mode
                         
                         # Add to history
                         READING_HISTORY.append(data)

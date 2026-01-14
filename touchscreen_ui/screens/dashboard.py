@@ -12,8 +12,12 @@ from kivy.graphics import Color, Rectangle
 from kivy.metrics import dp
 from kivy.clock import Clock
 import config
+import json
+import os
 from widgets.sensor_card import SensorCard
 from widgets.status_bar import StatusBar
+from widgets.navigation_sidebar import NavigationSidebar
+from widgets.tutorial_overlay import TutorialOverlay
 
 
 class DashboardScreen(Screen):
@@ -23,6 +27,13 @@ class DashboardScreen(Screen):
         super().__init__(**kwargs)
         self.app = app_instance
         self.name = 'dashboard'
+        
+        # Root layout with sidebar
+        root_layout = BoxLayout(orientation='horizontal', spacing=0)
+        
+        # Navigation sidebar
+        self.sidebar = NavigationSidebar(app_instance=app_instance)
+        root_layout.add_widget(self.sidebar)
         
         # Main layout
         main_layout = BoxLayout(orientation='vertical', spacing=0)
@@ -37,6 +48,8 @@ class DashboardScreen(Screen):
             padding=dp(20) * config.SCALE_FACTOR,
             spacing=dp(15) * config.SCALE_FACTOR
         )
+        
+        root_layout.add_widget(main_layout)
         
         # Title
         title = Label(
@@ -164,15 +177,46 @@ class DashboardScreen(Screen):
             size=lambda *x: setattr(self.bg_rect, 'size', main_layout.size)
         )
         
-        self.add_widget(main_layout)
+        self.add_widget(root_layout)
+        
+        # Tutorial overlay (shown on first run)
+        self.tutorial_overlay = None
+        self.config_file = 'data/device_state.json'
     
     def on_enter(self):
         """Called when screen is displayed"""
+        # Set sidebar active state
+        if hasattr(self, 'sidebar'):
+            self.sidebar.set_active_screen('dashboard')
+        
+        # Check if tutorial should be shown
+        self._check_show_tutorial()
+        
         # Update immediately
         self.update_display()
         
         # Schedule periodic updates
         self.update_event = Clock.schedule_interval(lambda dt: self.update_display(), 2)
+    
+    def _check_show_tutorial(self):
+        """Check if tutorial should be shown"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    state = json.load(f)
+                
+                # Show tutorial if not done yet
+                if not state.get('isTutorialDone', False):
+                    # Delay showing tutorial by 1 second to let screen load
+                    Clock.schedule_once(lambda dt: self._show_tutorial(), 1.0)
+        except Exception as e:
+            print(f"Error checking tutorial state: {e}")
+    
+    def _show_tutorial(self):
+        """Show tutorial overlay"""
+        if not self.tutorial_overlay:
+            self.tutorial_overlay = TutorialOverlay(dashboard_screen=self)
+            self.add_widget(self.tutorial_overlay)
     
     def on_leave(self):
         """Called when leaving screen"""

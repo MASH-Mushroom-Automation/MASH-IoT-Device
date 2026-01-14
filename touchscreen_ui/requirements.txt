@@ -17,6 +17,9 @@ python-socketio[client]>=5.10.0
 websocket-client>=1.6.4
 paho-mqtt>=1.6.1  # MQTT client for real-time updates
 
+# QR Code generation (for Setup Wizard)
+qrcode[pil]>=7.4.0
+
 # System utilities
 netifaces>=0.11.0  # Network interface info
 psutil>=5.9.6      # System resource monitoring
