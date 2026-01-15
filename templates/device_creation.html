@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MASH Device Creation & Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            width: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+        
+        .generated-id {
+            background: #f8f9fa;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .generated-id.show {
+            display: block;
+        }
+        
+        .generated-id h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .device-id-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            margin: 10px 0;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .id-components {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .id-component {
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        
+        .id-component .label {
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+        
+        .id-component .value {
+            color: #2c3e50;
+            font-weight: bold;
+        }
+        
+        .devices-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .device-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        .device-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .device-item.active {
+            border-left-color: #27ae60;
+        }
+        
+        .device-item.inactive {
+            border-left-color: #e74c3c;
+            opacity: 0.7;
+        }
+        
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .device-id {
+            font-weight: bold;
+            font-size: 16px;
+            color: #2c3e50;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .device-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .device-status.online {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .device-status.offline {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .device-info {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+        
+        .device-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-info {
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert.show {
+            display: block;
+        }
+        
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: #e0e0e0;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .id-components {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 MASH Device Creation & Management</h1>
+            <p>Generate Device IDs and Manage IoT Devices</p>
+        </div>
+        
+        <div class="main-grid">
+            <!-- Device Creation Form -->
+            <div class="card">
+                <h2>Create New Device</h2>
+                
+                <div id="alertContainer" class="alert"></div>
+                
+                <form id="deviceForm">
+                    <div class="form-group">
+                        <label for="brand">Brand</label>
+                        <input type="text" id="brand" value="MASH" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="model">Model Type</label>
+                            <select id="model" required>
+                                <option value="A">Alpha Prototype Build [A]</option>
+                                <option value="B">Beta Prototype Build [B]</option>
+                                <option value="R">Release Build [R]</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="version">Version</label>
+                            <input type="number" id="version" value="1" min="1" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="location">Location Code (3 chars)</label>
+                            <input type="text" id="location" value="CAL" maxlength="3" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="year">Year (2 digits)</label>
+                            <input type="number" id="year" value="25" min="0" max="99" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="deviceName">Device Name</label>
+                        <input type="text" id="deviceName" placeholder="e.g., Mushroom Chamber #1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="deviceLocation">Device Location</label>
+                        <input type="text" id="deviceLocation" placeholder="e.g., Lab Room A">
+                    </div>
+                    
+                    <button type="button" class="btn btn-primary" onclick="generateDeviceID()">
+                        🎲 Generate Device ID
+                    </button>
+                </form>
+                
+                <div id="generatedID" class="generated-id">
+                    <h3>Generated Device ID:</h3>
+                    <div id="deviceIDDisplay" class="device-id-display"></div>
+                    
+                    <div class="id-components">
+                        <div class="id-component">
+                            <span class="label">Brand:</span>
+                            <span class="value" id="compBrand"></span>
+                        </div>
+                        <div class="id-component">
+                            <span class="label">Model:</span>
+                            <span class="value" id="compModel"></span>
+                        </div>
+                        <div class="id-component">
+                            <span class="label">Version:</span>
+                            <span class="value" id="compVersion"></span>
+                        </div>
+                        <div class="id-component">
+                            <span class="label">Location:</span>
+                            <span class="value" id="compLocation"></span>
+                        </div>
+                        <div class="id-component">
+                            <span class="label">Year:</span>
+                            <span class="value" id="compYear"></span>
+                        </div>
+                        <div class="id-component">
+                            <span class="label">HEX Code:</span>
+                            <span class="value" id="compHex"></span>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-secondary" style="margin-top: 15px;" onclick="registerDevice()">
+                        ✅ Register Device
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Device List -->
+            <div class="card">
+                <h2>Device Management</h2>
+                
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('all')">All Devices</button>
+                    <button class="tab" onclick="switchTab('active')">Active</button>
+                    <button class="tab" onclick="switchTab('inactive')">Inactive</button>
+                </div>
+                
+                <div id="allDevices" class="tab-content active">
+                    <div class="devices-list" id="devicesList">
+                        <div class="empty-state">
+                            <i>📦</i>
+                            <p>No devices registered yet.<br>Create your first device!</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="activeDevices" class="tab-content">
+                    <div class="devices-list" id="activeDevicesList">
+                        <div class="empty-state">
+                            <i>✅</i>
+                            <p>No active devices found.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="inactiveDevices" class="tab-content">
+                    <div class="devices-list" id="inactiveDevicesList">
+                        <div class="empty-state">
+                            <i>❌</i>
+                            <p>No inactive devices found.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDeviceID = null;
+        let currentComponents = null;
+        
+        // Generate Device ID
+        async function generateDeviceID() {
+            const brand = document.getElementById('brand').value.toUpperCase().trim();
+            const model = document.getElementById('model').value;
+            const version = parseInt(document.getElementById('version').value);
+            const location = document.getElementById('location').value.toUpperCase().trim();
+            const year = parseInt(document.getElementById('year').value);
+            
+            try {
+                const response = await fetch('/api/v1/device-id/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        brand: brand,
+                        model: model,
+                        version: version,
+                        location: location,
+                        year: year
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentDeviceID = data.device_id;
+                    currentComponents = data.components;
+                    
+                    // Display the generated ID
+                    document.getElementById('deviceIDDisplay').textContent = data.device_id;
+                    document.getElementById('compBrand').textContent = data.components.brand;
+                    document.getElementById('compModel').textContent = `${data.components.model} (${data.components.model_name})`;
+                    document.getElementById('compVersion').textContent = data.components.version;
+                    document.getElementById('compLocation').textContent = data.components.location;
+                    document.getElementById('compYear').textContent = data.components.year;
+                    document.getElementById('compHex').textContent = data.components.hex_code;
+                    
+                    // Show the generated ID section
+                    document.getElementById('generatedID').classList.add('show');
+                    
+                    showAlert('success', 'Device ID generated successfully!');
+                } else {
+                    showAlert('error', 'Failed to generate Device ID: ' + data.message);
+                }
+            } catch (error) {
+                showAlert('error', 'Error generating Device ID: ' + error.message);
+            }
+        }
+        
+        // Register Device
+        async function registerDevice() {
+            if (!currentDeviceID) {
+                showAlert('error', 'Please generate a Device ID first!');
+                return;
+            }
+            
+            const deviceName = document.getElementById('deviceName').value;
+            const deviceLocation = document.getElementById('deviceLocation').value;
+            
+            if (!deviceName) {
+                showAlert('error', 'Please enter a device name!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/v1/devices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: currentDeviceID,
+                        serialNumber: currentDeviceID,
+                        name: deviceName,
+                        type: 'MUSHROOM_CHAMBER',
+                        location: deviceLocation,
+                        description: `${currentComponents.model_name} - Version ${currentComponents.version}`,
+                        isActive: true
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('success', 'Device registered successfully!');
+                    
+                    // Reset form
+                    document.getElementById('generatedID').classList.remove('show');
+                    document.getElementById('deviceName').value = '';
+                    document.getElementById('deviceLocation').value = '';
+                    currentDeviceID = null;
+                    currentComponents = null;
+                    
+                    // Reload devices list
+                    loadDevices();
+                } else {
+                    showAlert('error', 'Failed to register device: ' + (data.message || 'Unknown error'));
+                }
+            } catch (error) {
+                showAlert('error', 'Error registering device: ' + error.message);
+            }
+        }
+        
+        // Load Devices
+        async function loadDevices() {
+            try {
+                const response = await fetch('/api/v1/devices');
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    const devices = data.data.devices || data.devices || [];
+                    displayDevices(devices);
+                } else {
+                    console.error('Failed to load devices');
+                }
+            } catch (error) {
+                console.error('Error loading devices:', error);
+            }
+        }
+        
+        // Display Devices
+        function displayDevices(devices) {
+            const allList = document.getElementById('devicesList');
+            const activeList = document.getElementById('activeDevicesList');
+            const inactiveList = document.getElementById('inactiveDevicesList');
+            
+            allList.innerHTML = '';
+            activeList.innerHTML = '';
+            inactiveList.innerHTML = '';
+            
+            if (devices.length === 0) {
+                allList.innerHTML = '<div class="empty-state"><i>📦</i><p>No devices registered yet.</p></div>';
+                activeList.innerHTML = '<div class="empty-state"><i>✅</i><p>No active devices found.</p></div>';
+                inactiveList.innerHTML = '<div class="empty-state"><i>❌</i><p>No inactive devices found.</p></div>';
+                return;
+            }
+            
+            devices.forEach(device => {
+                const deviceItem = createDeviceItem(device);
+                allList.appendChild(deviceItem.cloneNode(true));
+                
+                if (device.isActive) {
+                    activeList.appendChild(deviceItem.cloneNode(true));
+                } else {
+                    inactiveList.appendChild(deviceItem);
+                }
+            });
+            
+            if (activeList.children.length === 0) {
+                activeList.innerHTML = '<div class="empty-state"><i>✅</i><p>No active devices found.</p></div>';
+            }
+            
+            if (inactiveList.children.length === 0) {
+                inactiveList.innerHTML = '<div class="empty-state"><i>❌</i><p>No inactive devices found.</p></div>';
+            }
+        }
+        
+        // Create Device Item
+        function createDeviceItem(device) {
+            const div = document.createElement('div');
+            div.className = `device-item ${device.isActive ? 'active' : 'inactive'}`;
+            
+            const status = device.status || (device.isActive ? 'ONLINE' : 'OFFLINE');
+            
+            div.innerHTML = `
+                <div class="device-header">
+                    <span class="device-id">${device.id || device.serialNumber}</span>
+                    <span class="device-status ${status.toLowerCase()}">${status}</span>
+                </div>
+                <div class="device-info">
+                    <strong>${device.name}</strong><br>
+                    Type: ${device.type}<br>
+                    ${device.location ? 'Location: ' + device.location + '<br>' : ''}
+                    ${device.description ? device.description + '<br>' : ''}
+                    Created: ${new Date(device.createdAt).toLocaleString()}
+                </div>
+                <div class="device-actions">
+                    <button class="btn-small btn-info" onclick="viewDevice('${device.id}')">View Details</button>
+                    <button class="btn-small btn-danger" onclick="deleteDevice('${device.id}')">Delete</button>
+                </div>
+            `;
+            
+            return div;
+        }
+        
+        // View Device Details
+        function viewDevice(deviceId) {
+            alert('View device details: ' + deviceId + '\n\nThis will redirect to device details page (to be implemented)');
+        }
+        
+        // Delete Device
+        async function deleteDevice(deviceId) {
+            if (!confirm('Are you sure you want to delete this device?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/devices/${deviceId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showAlert('success', 'Device deleted successfully!');
+                    loadDevices();
+                } else {
+                    showAlert('error', 'Failed to delete device');
+                }
+            } catch (error) {
+                showAlert('error', 'Error deleting device: ' + error.message);
+            }
+        }
+        
+        // Switch Tab
+        function switchTab(tab) {
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            // Add active class to selected tab
+            if (tab === 'all') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('allDevices').classList.add('active');
+            } else if (tab === 'active') {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('activeDevices').classList.add('active');
+            } else if (tab === 'inactive') {
+                document.querySelector('.tab:nth-child(3)').classList.add('active');
+                document.getElementById('inactiveDevices').classList.add('active');
+            }
+        }
+        
+        // Show Alert
+        function showAlert(type, message) {
+            const alert = document.getElementById('alertContainer');
+            alert.className = `alert ${type} show`;
+            alert.textContent = message;
+            
+            setTimeout(() => {
+                alert.classList.remove('show');
+            }, 5000);
+        }
+        
+        // Load devices on page load
+        loadDevices();
+        
+        // Auto-refresh devices every 30 seconds
+        setInterval(loadDevices, 30000);
+    </script>
+</body>
+</html>
