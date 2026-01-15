@@ -13,7 +13,7 @@ device:
 
 # Backend Configuration
 backend:
-  api_url: "https://mash-backend-api-production.up.railway.app/api/v1/"
+  api_url: "https://mash-backend-production.up.railway.app/api/v1/"
   api_key: ""
   timeout: 30
 

@@ -235,7 +235,7 @@ try:
     logger.info(f"Device ID from config: '{device_id}'")
     logger.info(f"DEVICE_ID variable: '{DEVICE_ID}'")
     
-    backend_api_url = os.getenv('BACKEND_API_URL', config.get('backend_api_url', 'https://mash-backend-api-production.up.railway.app/api/v1'))
+    backend_api_url = os.getenv('BACKEND_API_URL', config.get('backend_api_url', 'https://mash-backend-production.up.railway.app/api/v1'))
     backend_api_key = os.getenv('BACKEND_API_KEY', config.get('backend_api_key', ''))
     backend_timeout = int(os.getenv('BACKEND_TIMEOUT', config.get('backend_timeout', 30)))
     

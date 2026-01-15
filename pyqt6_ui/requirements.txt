@@ -1,0 +1,14 @@
+# MASH IoT Device - PyQt6 UI Requirements
+
+# Core PyQt6
+PyQt6>=6.6.0
+PyQt6-Charts>=6.6.0
+
+# Networking and API
+requests>=2.31.0
+
+# Environment configuration
+python-dotenv>=1.0.0
+
+# Date and time utilities (included in Python standard library)
+# datetime, time are built-in
