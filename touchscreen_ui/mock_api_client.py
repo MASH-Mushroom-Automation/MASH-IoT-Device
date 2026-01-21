@@ -32,105 +32,161 @@ class MockAPIClient:
         }
         
         # Mock alerts history
+        base_date = datetime(2026, 1, 13, 14, 30)  # January 13, 2026, 2:30 PM
         self.alerts = [
             {
                 'id': 1,
-                'timestamp': (datetime.now() - timedelta(minutes=5)).isoformat(),
+                'timestamp': (base_date - timedelta(minutes=2)).isoformat(),
                 'severity': 'info',
-                'message': 'System started successfully',
+                'message': 'System operating normally - all parameters within optimal range',
                 'category': 'system'
             },
             {
                 'id': 2,
-                'timestamp': (datetime.now() - timedelta(minutes=15)).isoformat(),
+                'timestamp': (base_date - timedelta(minutes=8)).isoformat(),
                 'severity': 'warning',
-                'message': 'CO2 level approaching upper threshold (1450 ppm)',
+                'message': 'CO2 level approaching upper threshold (1450 ppm). Exhaust fan activated.',
                 'category': 'sensor'
             },
             {
                 'id': 3,
-                'timestamp': (datetime.now() - timedelta(hours=1)).isoformat(),
+                'timestamp': (base_date - timedelta(minutes=15)).isoformat(),
                 'severity': 'info',
-                'message': 'Automation enabled',
+                'message': 'Automation system successfully adjusted humidity levels',
                 'category': 'automation'
             },
             {
                 'id': 4,
-                'timestamp': (datetime.now() - timedelta(hours=2)).isoformat(),
-                'severity': 'warning',
-                'message': 'Humidity dropped below threshold (82%)',
+                'timestamp': (base_date - timedelta(minutes=25)).isoformat(),
+                'severity': 'error',
+                'message': 'Temperature sensor reading anomaly detected - validating...',
                 'category': 'sensor'
             },
             {
                 'id': 5,
-                'timestamp': (datetime.now() - timedelta(hours=3)).isoformat(),
+                'timestamp': (base_date - timedelta(minutes=32)).isoformat(),
                 'severity': 'info',
-                'message': 'Humidifier activated by automation',
+                'message': 'Sensor validation complete - all systems nominal',
+                'category': 'system'
+            },
+            {
+                'id': 6,
+                'timestamp': (base_date - timedelta(hours=1)).isoformat(),
+                'severity': 'warning',
+                'message': 'Humidity dropped below optimal threshold (78%). Humidifier enabled.',
+                'category': 'sensor'
+            },
+            {
+                'id': 7,
+                'timestamp': (base_date - timedelta(hours=1, minutes=15)).isoformat(),
+                'severity': 'info',
+                'message': 'Grow lights cycle initiated - 18-hour photoperiod',
                 'category': 'automation'
+            },
+            {
+                'id': 8,
+                'timestamp': (base_date - timedelta(hours=2)).isoformat(),
+                'severity': 'warning',
+                'message': 'CO2 level temporarily exceeded maximum (1520 ppm). Auto-corrected.',
+                'category': 'sensor'
+            },
+            {
+                'id': 9,
+                'timestamp': (base_date - timedelta(hours=3)).isoformat(),
+                'severity': 'info',
+                'message': 'Daily maintenance check completed successfully',
+                'category': 'system'
+            },
+            {
+                'id': 10,
+                'timestamp': (base_date - timedelta(hours=4)).isoformat(),
+                'severity': 'error',
+                'message': 'Network connectivity temporarily lost - operating in offline mode',
+                'category': 'network'
+            },
+            {
+                'id': 11,
+                'timestamp': (base_date - timedelta(hours=4, minutes=5)).isoformat(),
+                'severity': 'info',
+                'message': 'Network connectivity restored - cloud sync complete',
+                'category': 'network'
+            },
+            {
+                'id': 12,
+                'timestamp': (base_date - timedelta(hours=6)).isoformat(),
+                'severity': 'warning',
+                'message': 'Circulation fan running at reduced efficiency - maintenance recommended',
+                'category': 'actuator'
             }
         ]
         
         # Mock AI insights history
         self.ai_insights = [
             {
-                'timestamp': (datetime.now() - timedelta(minutes=2)).isoformat(),
+                'timestamp': (base_date - timedelta(minutes=2)).isoformat(),
+                'action': 'Optimal Conditions Maintained',
                 'sensor_data': {
-                    'co2': 1380,
-                    'temperature': 18.8,
-                    'humidity': 86.2
+                    'co2': 1280,
+                    'temperature': 18.5,
+                    'humidity': 85.0
                 },
-                'mode': 'auto',
-                'reasoning': [
-                    'CO2 level within optimal range',
-                    'Temperature stable',
-                    'Humidity slightly above target - monitoring'
-                ],
-                'actions': {
-                    'humidifier': False,
-                    'fan_exhaust': False,
-                    'fan_circulation': True,
-                    'led_grow': True
-                }
+                'reasoning': 'All environmental parameters are within optimal ranges for mushroom cultivation. CO2 at 1280 ppm provides excellent growth conditions. Temperature steady at 18.5°C supports proper fruiting body development. Humidity at 85% prevents drying while avoiding excess moisture. System maintaining current actuator configuration.',
+                'mode': 'auto'
             },
             {
-                'timestamp': (datetime.now() - timedelta(minutes=5)).isoformat(),
+                'timestamp': (base_date - timedelta(minutes=8)).isoformat(),
+                'action': 'CO2 Reduction Initiated',
                 'sensor_data': {
-                    'co2': 1420,
+                    'co2': 1450,
                     'temperature': 19.1,
+                    'humidity': 87.5
+                },
+                'reasoning': 'CO2 level approaching upper threshold at 1450 ppm. Activated exhaust fan to reduce CO2 concentration and prevent growth inhibition. Temperature slightly elevated at 19.1°C - exhaust will also assist cooling. Humidity within acceptable range but monitoring for potential excess due to temperature rise.',
+                'mode': 'auto'
+            },
+            {
+                'timestamp': (base_date - timedelta(minutes=15)).isoformat(),
+                'action': 'Humidity Adjustment',
+                'sensor_data': {
+                    'co2': 1180,
+                    'temperature': 18.2,
+                    'humidity': 79.0
+                },
+                'reasoning': 'Humidity dropped to 79% which is below optimal range for pinning stage. Enabled humidifier to increase moisture levels and prevent premature drying of substrate. CO2 slightly low at 1180 ppm but within acceptable range. Temperature stable and optimal for current growth phase.',
+                'mode': 'auto'
+            },
+            {
+                'timestamp': (base_date - timedelta(minutes=25)).isoformat(),
+                'action': 'Environmental Stabilization',
+                'sensor_data': {
+                    'co2': 1320,
+                    'temperature': 18.7,
+                    'humidity': 86.0
+                },
+                'reasoning': 'System successfully stabilized after previous adjustments. All parameters now in optimal ranges. CO2 at ideal level for active mycelial growth. Temperature and humidity perfect for fruiting. Circulation fan maintains air movement without causing excessive drying. No actuator changes required.',
+                'mode': 'auto'
+            },
+            {
+                'timestamp': (base_date - timedelta(minutes=35)).isoformat(),
+                'action': 'Temperature Control Activated',
+                'sensor_data': {
+                    'co2': 1390,
+                    'temperature': 19.8,
                     'humidity': 88.5
                 },
-                'mode': 'auto',
-                'reasoning': [
-                    'CO2 approaching upper threshold',
-                    'Temperature rising - initiating cooling',
-                    'Humidity high - exhaust fan activated'
-                ],
-                'actions': {
-                    'humidifier': False,
-                    'fan_exhaust': True,
-                    'fan_circulation': True,
-                    'led_grow': True
-                }
+                'reasoning': 'Temperature rising above optimal threshold at 19.8°C, likely due to ambient conditions. Increased air circulation and activated exhaust fan to facilitate heat exchange. CO2 levels elevated but not critical. Monitoring humidity closely as exhaust may cause decrease.',
+                'mode': 'auto'
             },
             {
-                'timestamp': (datetime.now() - timedelta(minutes=10)).isoformat(),
+                'timestamp': (base_date - timedelta(hours=1)).isoformat(),
+                'action': 'Night Cycle Transition',
                 'sensor_data': {
-                    'co2': 1250,
-                    'temperature': 18.3,
-                    'humidity': 83.0
+                    'co2': 1240,
+                    'temperature': 17.9,
+                    'humidity': 84.0
                 },
-                'mode': 'auto',
-                'reasoning': [
-                    'All parameters optimal',
-                    'Humidity below target - humidifier enabled',
-                    'Maintaining circulation'
-                ],
-                'actions': {
-                    'humidifier': True,
-                    'fan_exhaust': False,
-                    'fan_circulation': True,
-                    'led_grow': True
-                }
+                'reasoning': 'Transitioning to night cycle parameters. Reduced lighting intensity while maintaining environmental controls. Temperature naturally declining as expected. CO2 and humidity levels stable and appropriate for rest period. All systems functioning optimally.',
+                'mode': 'auto'
             }
         ]
         
@@ -185,6 +241,10 @@ class MockAPIClient:
         """Alias for get_sensor_current (backward compatibility)"""
         result = self.get_sensor_current()
         return result.get('data') if result and result.get('success') else None
+    
+    def get_sensor_data(self) -> Dict:
+        """Get sensor data - another alias for compatibility"""
+        return self._get_simulated_sensor_data()
     
     def get_sensor_history(self, hours: int = 1) -> Dict:
         """Get sensor reading history"""
@@ -254,6 +314,7 @@ class MockAPIClient:
     def get_automation_status(self) -> Dict:
         """Get automation status"""
         return {
+            'automation_enabled': self.automation_enabled,
             'enabled': self.automation_enabled,
             'mode': 'manual' if self.manual_mode else 'auto',
             'last_decision': datetime.now().isoformat()
@@ -279,27 +340,29 @@ class MockAPIClient:
             'enabled': False
         }
     
-    def get_automation_history(self, limit: int = 10) -> Dict:
+    def set_automation_mode(self, enabled: bool) -> Dict:
+        """Set automation mode"""
+        if enabled:
+            return self.enable_automation()
+        else:
+            return self.disable_automation()
+    
+    def get_automation_history(self, limit: int = 10):
         """Get automation decision history"""
-        return {
-            'success': True,
-            'history': self.ai_insights[:limit]
-        }
+        # Return list directly for compatibility with screens
+        return self.ai_insights[:limit]
     
     # ========== Alerts/Logs Endpoints ==========
     
-    def get_alerts(self, severity: str = None, limit: int = 50) -> Dict:
+    def get_alerts(self, severity: str = None, limit: int = 50):
         """Get system alerts"""
         alerts = self.alerts
         
         if severity:
             alerts = [a for a in alerts if a['severity'] == severity]
         
-        return {
-            'success': True,
-            'alerts': alerts[:limit],
-            'count': len(alerts)
-        }
+        # Return list directly for compatibility with screens
+        return alerts[:limit]
     
     def get_alert_logs(self, severity: str = None, limit: int = 50) -> Dict:
         """Alias for get_alerts (backward compatibility)"""

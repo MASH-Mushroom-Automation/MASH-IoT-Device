@@ -17,6 +17,7 @@ from config import (
     SENSOR_UPDATE_INTERVAL, CHART_HISTORY_MINUTES
 )
 from api_client import APIClient
+from icon_utils import load_svg_icon, create_icon
 
 
 class SensorCard(QFrame):
@@ -32,11 +33,12 @@ class SensorCard(QFrame):
     def setup_ui(self, icon_name: str):
         """Setup card UI"""
         self.setProperty("class", "card")
-        self.setMinimumHeight(120)
+        self.setMinimumHeight(160)
+        self.setMinimumWidth(220)
         
         layout = QVBoxLayout()
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(6)
         
         # Header with icon and name
         header = QHBoxLayout()
@@ -46,20 +48,16 @@ class SensorCard(QFrame):
         icon_path = ICONS_DIR / icon_name
         if icon_path.exists():
             icon_label = QLabel()
-            pixmap = QPixmap(str(icon_path))
-            # Colorize icon
-            icon_label.setPixmap(pixmap.scaled(
-                32, 32,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            pixmap = load_svg_icon(icon_path, 32, self.color)
+            icon_label.setPixmap(pixmap)
             header.addWidget(icon_label)
         
         # Name
         name_label = QLabel(self.name.replace('_', ' ').title())
+        name_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         name_label.setStyleSheet(f"""
-            font-size: 13px;
-            font-weight: 500;
+            font-size: 15px;
+            font-weight: 600;
             color: {COLORS['text_secondary']};
         """)
         header.addWidget(name_label)
@@ -70,8 +68,9 @@ class SensorCard(QFrame):
         # Value
         self.value_label = QLabel("--")
         self.value_label.setProperty("class", "sensor-value")
+        self.value_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.value_label.setStyleSheet(f"""
-            font-size: 36px;
+            font-size: 42px;
             font-weight: bold;
             color: {self.color};
         """)
@@ -81,18 +80,21 @@ class SensorCard(QFrame):
         bottom = QHBoxLayout()
         
         self.unit_label = QLabel(self.unit)
+        self.unit_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.unit_label.setStyleSheet(f"""
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         bottom.addWidget(self.unit_label)
         bottom.addStretch()
         
         self.status_label = QLabel("Normal")
+        self.status_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.status_label.setStyleSheet(f"""
-            font-size: 12px;
+            font-size: 14px;
             color: {COLORS['success']};
-            font-weight: 500;
+            font-weight: 600;
         """)
         bottom.addWidget(self.status_label)
         
@@ -114,9 +116,9 @@ class SensorCard(QFrame):
             color = COLORS['error']
         
         self.status_label.setStyleSheet(f"""
-            font-size: 12px;
+            font-size: 14px;
             color: {color};
-            font-weight: 500;
+            font-weight: 600;
         """)
 
 
@@ -135,14 +137,15 @@ class SensorChart(QFrame):
         self.setProperty("class", "card")
         
         layout = QVBoxLayout()
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
         
         # Title
         title_label = QLabel(self.title)
+        title_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         title_label.setStyleSheet(f"""
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 16px;
+            font-weight: 700;
             color: {COLORS['text_primary']};
         """)
         layout.addWidget(title_label)
@@ -220,15 +223,15 @@ class DashboardScreen(QWidget):
     def setup_ui(self):
         """Setup dashboard UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         
         # Header
         header = QHBoxLayout()
         
         title = QLabel("Dashboard")
         title.setStyleSheet(f"""
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: {COLORS['text_primary']};
         """)
@@ -239,7 +242,7 @@ class DashboardScreen(QWidget):
         refresh_btn = QPushButton()
         icon_path = ICONS_DIR / ICONS['refresh']
         if icon_path.exists():
-            refresh_btn.setIcon(QIcon(str(icon_path)))
+            refresh_btn.setIcon(create_icon(icon_path, 20, COLORS['text_primary']))
             refresh_btn.setIconSize(QSize(20, 20))
         refresh_btn.setText("Refresh")
         refresh_btn.clicked.connect(self.refresh)
@@ -252,9 +255,9 @@ class DashboardScreen(QWidget):
         cards_grid.setSpacing(16)
         
         self.sensor_cards = {
-            'co2': SensorCard('CO2', ICONS['co2'], 'ppm', COLORS['co2']),
-            'temperature': SensorCard('Temperature', ICONS['temperature'], '°C', COLORS['temperature']),
-            'humidity': SensorCard('Humidity', ICONS['humidity'], '%', COLORS['humidity']),
+            'co2': SensorCard('CO2', ICONS['co2'], 'ppm', COLORS['co2_color']),
+            'temperature': SensorCard('Temperature', ICONS['temperature'], '°C', COLORS['temperature_color']),
+            'humidity': SensorCard('Humidity', ICONS['humidity'], '%', COLORS['humidity_color']),
         }
         
         cards_grid.addWidget(self.sensor_cards['co2'], 0, 0)
@@ -280,6 +283,12 @@ class DashboardScreen(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Enable kinetic scrolling for touch
+        scroll.setProperty("kineticScrollingEnabled", True)
+        scroll.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
         
         chart_container = QWidget()
         chart_container.setLayout(charts_layout)

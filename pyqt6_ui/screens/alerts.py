@@ -13,6 +13,7 @@ from datetime import datetime
 
 from config import COLORS, ICONS_DIR, ICONS, ALERT_CHECK_INTERVAL
 from api_client import APIClient
+from icon_utils import load_svg_icon, create_icon
 
 
 class AlertItem(QFrame):
@@ -41,12 +42,12 @@ class AlertItem(QFrame):
                 background-color: {COLORS['surface']};
                 border-left: 4px solid {border_color};
                 border-radius: 8px;
-                padding: 16px;
+                padding: 12px;
             }}
         """)
         
         layout = QVBoxLayout()
-        layout.setSpacing(8)
+        layout.setSpacing(6)
         
         # Header with severity icon and timestamp
         header = QHBoxLayout()
@@ -64,19 +65,16 @@ class AlertItem(QFrame):
         
         if icon_path.exists():
             icon_label = QLabel()
-            pixmap = QPixmap(str(icon_path))
-            icon_label.setPixmap(pixmap.scaled(
-                24, 24,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            pixmap = load_svg_icon(icon_path, 24, border_color)
+            icon_label.setPixmap(pixmap)
             header.addWidget(icon_label)
         
         # Severity label
         severity_label = QLabel(severity.upper())
+        severity_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         severity_label.setStyleSheet(f"""
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 700;
             color: {border_color};
         """)
         header.addWidget(severity_label)
@@ -93,7 +91,8 @@ class AlertItem(QFrame):
                 
                 time_label = QLabel(f"{date_str} {time_str}")
                 time_label.setStyleSheet(f"""
-                    font-size: 11px;
+                    font-size: 12px;
+                    font-weight: 500;
                     color: {COLORS['text_secondary']};
                 """)
                 header.addWidget(time_label)
@@ -107,7 +106,8 @@ class AlertItem(QFrame):
         message_label = QLabel(message)
         message_label.setWordWrap(True)
         message_label.setStyleSheet(f"""
-            font-size: 14px;
+            font-size: 15px;
+            font-weight: 500;
             color: {COLORS['text_primary']};
             line-height: 1.5;
         """)
@@ -117,8 +117,10 @@ class AlertItem(QFrame):
         category = self.alert_data.get('category', '')
         if category:
             category_label = QLabel(f"Category: {category}")
+            category_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
             category_label.setStyleSheet(f"""
-                font-size: 11px;
+                font-size: 12px;
+                font-weight: 500;
                 color: {COLORS['text_secondary']};
                 font-style: italic;
             """)
@@ -140,15 +142,15 @@ class AlertsScreen(QWidget):
     def setup_ui(self):
         """Setup alerts UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(14)
         
         # Header
         header = QHBoxLayout()
         
         title = QLabel("System Alerts")
         title.setStyleSheet(f"""
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: {COLORS['text_primary']};
         """)
@@ -159,7 +161,7 @@ class AlertsScreen(QWidget):
         refresh_btn = QPushButton()
         icon_path = ICONS_DIR / ICONS['refresh']
         if icon_path.exists():
-            refresh_btn.setIcon(QIcon(str(icon_path)))
+            refresh_btn.setIcon(create_icon(icon_path, 20, COLORS['text_primary']))
             refresh_btn.setIconSize(QSize(20, 20))
         refresh_btn.setText("Refresh")
         refresh_btn.clicked.connect(self.refresh)
@@ -199,7 +201,8 @@ class AlertsScreen(QWidget):
         # Alert count
         self.count_label = QLabel("0 alerts")
         self.count_label.setStyleSheet(f"""
-            font-size: 13px;
+            font-size: 14px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         layout.addWidget(self.count_label)
@@ -214,6 +217,13 @@ class AlertsScreen(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Enable kinetic scrolling for touch
+        scroll.setProperty("kineticScrollingEnabled", True)
+        scroll.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
+        
         scroll.setWidget(self.alerts_container)
         
         layout.addWidget(scroll)
@@ -268,7 +278,8 @@ class AlertsScreen(QWidget):
             # No alerts message
             no_alerts = QLabel("No alerts to display")
             no_alerts.setStyleSheet(f"""
-                font-size: 14px;
+                font-size: 16px;
+                font-weight: 500;
                 color: {COLORS['text_secondary']};
                 padding: 40px;
             """)
@@ -287,7 +298,8 @@ class AlertsScreen(QWidget):
         
         error_label = QLabel("Failed to load alerts")
         error_label.setStyleSheet(f"""
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 600;
             color: {COLORS['error']};
             padding: 40px;
         """)

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # ========== Demo/Mock Mode ==========
-MOCK_MODE = os.getenv('MOCK_MODE', 'false').lower() == 'true'
+MOCK_MODE = os.getenv('MOCK_MODE', 'true').lower() == 'true'
 
 # ========== Flask Backend API Configuration ==========
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://127.0.0.1:5000/api')
@@ -45,27 +45,39 @@ COLORS = {
     'info': '#2196F3',            # Blue
     
     # Text colors
-    'text_primary': '#F2F2F7',    # Almost white
-    'text_secondary': '#ADADB5',  # Gray
-    'text_disabled': '#787880',   # Dark gray
+    'text_primary': '#FFFFFF',    # Pure white for maximum contrast
+    'text_secondary': '#D0D0D8',  # Brighter gray for better visibility
+    'text_tertiary': '#A0A0A8',   # Tertiary text
+    'text_disabled': '#8B8B95',   # Slightly brighter dark gray
+    
+    # Additional UI colors
+    'bg': '#17171C',              # Main background
+    'card_bg': '#2D2D35',         # Card background
+    'hover_bg': '#35353D',        # Hover background
+    'border': '#3A3A42',          # Border color
+    'border_light': '#45454D',    # Light border
+    'primary_hover': '#52E88C',   # Primary hover
+    'primary_pressed': '#34A65E', # Primary pressed
     
     # Sensor colors
     'co2': '#2196F3',             # Blue
+    'co2_color': '#2196F3',       # Blue
     'temperature': '#FF6B35',     # Orange-red
+    'temperature_color': '#FF6B35', # Orange-red
     'humidity': '#4ECDC4',        # Cyan
-    
-    # Borders
-    'border': '#35353D',
-    'border_light': '#45454D',
+    'humidity_color': '#4ECDC4',  # Cyan
 }
 
 # ========== Typography ==========
 FONTS = {
-    'heading': {'family': 'Segoe UI', 'size': 18, 'weight': 'bold'},
-    'subheading': {'family': 'Segoe UI', 'size': 14, 'weight': 'semibold'},
-    'body': {'family': 'Segoe UI', 'size': 12, 'weight': 'normal'},
-    'caption': {'family': 'Segoe UI', 'size': 10, 'weight': 'normal'},
-    'value': {'family': 'Segoe UI', 'size': 28, 'weight': 'bold'},
+    'heading': 22,
+    'subheading': 16,
+    'body': 14,
+    'body_small': 12,
+    'caption': 11,
+    'button': 14,
+    'label': 13,
+    'value': 32,
 }
 
 # ========== Sensor Thresholds ==========
@@ -87,38 +99,41 @@ CHART_MAX_POINTS = 60
 # ========== Icon Mapping ==========
 ICONS = {
     # Navigation
-    'home': 'house.png',
-    'controls': 'sliders-vertical.png',
-    'alerts': 'bell.png',
-    'ai_insights': 'brain.png',
-    'settings': 'settings.png',
-    'help': 'circle-question-mark.png',
+    'home': 'house.svg',
+    'dashboard': 'house.svg',
+    'controls': 'sliders-vertical.svg',
+    'alerts': 'bell.svg',
+    'ai_insights': 'brain.svg',
+    'automation': 'brain.svg',
+    'settings': 'settings.svg',
+    'help': 'circle-question-mark.svg',
     
     # Sensors
-    'co2': 'wind.png',
-    'temperature': 'thermometer.png',
-    'humidity': 'droplet.png',
+    'sensor': 'thermometer.svg',
+    'co2': 'wind.svg',
+    'temperature': 'thermometer.svg',
+    'humidity': 'droplet.svg',
     
     # Actuators
-    'humidifier': 'droplets.png',
-    'fan_exhaust': 'air-vent.png',
-    'fan_circulation': 'fan.png',
-    'led_grow': 'lightbulb(1).png',
+    'humidifier': 'droplets.svg',
+    'fan_exhaust': 'air-vent.svg',
+    'fan_circulation': 'fan.svg',
+    'led_grow': 'lightbulb.svg',
     
     # Status
-    'success': 'circle-check-big.png',
-    'warning': 'triangle-alert.png',
-    'error': 'circle-alert.png',
-    'info': 'info.png',
+    'success': 'circle-check-big.svg',
+    'warning': 'triangle-alert.svg',
+    'error': 'circle-alert.svg',
+    'info': 'info.svg',
     
     # Actions
-    'refresh': 'refresh-cw.png',
-    'download': 'download.png',
-    'power': 'power.png',
-    'play': 'play.png',
-    'pause': 'pause.png',
-    'hand': 'hand.png',
-    'zap': 'zap.png',
+    'refresh': 'refresh-cw.svg',
+    'download': 'download.svg',
+    'power': 'power.svg',
+    'play': 'play.svg',
+    'pause': 'pause.svg',
+    'hand': 'hand.svg',
+    'zap': 'zap.svg',
 }
 
 # ========== Stylesheet ==========
@@ -134,7 +149,7 @@ def get_stylesheet():
     QWidget {{
         color: {COLORS['text_primary']};
         font-family: 'Segoe UI';
-        font-size: 12px;
+        font-size: 14px;
     }}
     
     /* Labels */
@@ -149,8 +164,9 @@ def get_stylesheet():
         color: {COLORS['text_primary']};
         border: 1px solid {COLORS['border']};
         border-radius: 8px;
-        padding: 10px 16px;
-        font-weight: 500;
+        padding: 12px 20px;
+        font-size: 15px;
+        font-weight: 600;
     }}
     
     QPushButton:hover {{
@@ -206,7 +222,7 @@ def get_stylesheet():
         background-color: {COLORS['card']};
         border-radius: 12px;
         border: 1px solid {COLORS['border']};
-        padding: 16px;
+        padding: 12px;
     }}
     
     /* Scroll Area */
@@ -217,18 +233,29 @@ def get_stylesheet():
     
     QScrollBar:vertical {{
         background-color: {COLORS['surface']};
-        width: 8px;
-        border-radius: 4px;
+        width: 10px;
+        border-radius: 5px;
+        margin: 2px;
     }}
     
     QScrollBar::handle:vertical {{
         background-color: {COLORS['border_light']};
-        border-radius: 4px;
-        min-height: 20px;
+        border-radius: 5px;
+        min-height: 30px;
     }}
     
     QScrollBar::handle:vertical:hover {{
         background-color: {COLORS['primary']};
+    }}
+    
+    QScrollBar::add-line:vertical,
+    QScrollBar::sub-line:vertical {{
+        height: 0px;
+    }}
+    
+    QScrollBar::add-page:vertical,
+    QScrollBar::sub-page:vertical {{
+        background: none;
     }}
     
     /* Status Indicators */
@@ -243,13 +270,14 @@ def get_stylesheet():
     
     /* Sensor Values */
     QLabel.sensor-value {{
-        font-size: 28px;
+        font-size: 38px;
         font-weight: bold;
         color: {COLORS['text_primary']};
     }}
     
     QLabel.sensor-unit {{
-        font-size: 14px;
+        font-size: 16px;
+        font-weight: 500;
         color: {COLORS['text_secondary']};
     }}
     

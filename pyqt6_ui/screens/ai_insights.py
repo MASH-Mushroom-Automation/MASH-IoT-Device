@@ -13,6 +13,7 @@ from datetime import datetime
 
 from config import COLORS, ICONS_DIR, ICONS, ALERT_CHECK_INTERVAL
 from api_client import APIClient
+from icon_utils import load_svg_icon, create_icon
 
 
 class InsightCard(QFrame):
@@ -28,8 +29,8 @@ class InsightCard(QFrame):
         self.setProperty("class", "card")
         
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
         
         # Header with timestamp and action
         header = QHBoxLayout()
@@ -39,20 +40,17 @@ class InsightCard(QFrame):
         icon_path = ICONS_DIR / ICONS['ai_insights']
         if icon_path.exists():
             icon_label = QLabel()
-            pixmap = QPixmap(str(icon_path))
-            icon_label.setPixmap(pixmap.scaled(
-                28, 28,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            pixmap = load_svg_icon(icon_path, 28, COLORS['primary'])
+            icon_label.setPixmap(pixmap)
             header.addWidget(icon_label)
         
         # Action
         action = self.insight_data.get('action', 'System Action')
         action_label = QLabel(action)
+        action_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         action_label.setStyleSheet(f"""
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: {COLORS['text_primary']};
         """)
         header.addWidget(action_label)
@@ -69,7 +67,8 @@ class InsightCard(QFrame):
                 
                 time_label = QLabel(f"{date_str} {time_str}")
                 time_label.setStyleSheet(f"""
-                    font-size: 12px;
+                    font-size: 13px;
+                    font-weight: 500;
                     color: {COLORS['text_secondary']};
                 """)
                 header.addWidget(time_label)
@@ -89,9 +88,10 @@ class InsightCard(QFrame):
         reasoning = self.insight_data.get('reasoning', 'No reasoning provided')
         
         reasoning_header = QLabel("AI Reasoning:")
+        reasoning_header.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         reasoning_header.setStyleSheet(f"""
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 700;
             color: {COLORS['text_secondary']};
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -99,9 +99,11 @@ class InsightCard(QFrame):
         layout.addWidget(reasoning_header)
         
         reasoning_label = QLabel(reasoning)
+        reasoning_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         reasoning_label.setWordWrap(True)
         reasoning_label.setStyleSheet(f"""
-            font-size: 13px;
+            font-size: 15px;
+            font-weight: 500;
             color: {COLORS['text_primary']};
             line-height: 1.6;
         """)
@@ -114,8 +116,8 @@ class InsightCard(QFrame):
             
             sensor_header = QLabel("Sensor Readings:")
             sensor_header.setStyleSheet(f"""
-                font-size: 12px;
-                font-weight: 600;
+                font-size: 13px;
+                font-weight: 700;
                 color: {COLORS['text_secondary']};
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
@@ -169,15 +171,16 @@ class InsightCard(QFrame):
         
         name_label = QLabel(name)
         name_label.setStyleSheet(f"""
-            font-size: 11px;
+            font-size: 12px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         layout.addWidget(name_label)
         
         value_label = QLabel(f"{value:.1f} {unit}")
         value_label.setStyleSheet(f"""
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 16px;
+            font-weight: 700;
             color: {color};
         """)
         layout.addWidget(value_label)
@@ -198,15 +201,15 @@ class AIInsightsScreen(QWidget):
     def setup_ui(self):
         """Setup insights UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(14)
         
         # Header
         header = QHBoxLayout()
         
         title = QLabel("AI Insights")
         title.setStyleSheet(f"""
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: {COLORS['text_primary']};
         """)
@@ -217,7 +220,7 @@ class AIInsightsScreen(QWidget):
         refresh_btn = QPushButton()
         icon_path = ICONS_DIR / ICONS['refresh']
         if icon_path.exists():
-            refresh_btn.setIcon(QIcon(str(icon_path)))
+            refresh_btn.setIcon(create_icon(icon_path, 20, COLORS['text_primary']))
             refresh_btn.setIconSize(QSize(20, 20))
         refresh_btn.setText("Refresh")
         refresh_btn.clicked.connect(self.refresh)
@@ -228,7 +231,8 @@ class AIInsightsScreen(QWidget):
         # Description
         desc = QLabel("View automation decisions and the reasoning behind each action.")
         desc.setStyleSheet(f"""
-            font-size: 14px;
+            font-size: 15px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         desc.setWordWrap(True)
@@ -237,7 +241,8 @@ class AIInsightsScreen(QWidget):
         # Insights count
         self.count_label = QLabel("0 decisions")
         self.count_label.setStyleSheet(f"""
-            font-size: 13px;
+            font-size: 14px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         layout.addWidget(self.count_label)
@@ -252,6 +257,13 @@ class AIInsightsScreen(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Enable kinetic scrolling for touch
+        scroll.setProperty("kineticScrollingEnabled", True)
+        scroll.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
+        
         scroll.setWidget(self.insights_container)
         
         layout.addWidget(scroll)
@@ -302,7 +314,8 @@ class AIInsightsScreen(QWidget):
             # No insights message
             no_insights = QLabel("No AI decisions recorded yet")
             no_insights.setStyleSheet(f"""
-                font-size: 14px;
+                font-size: 16px;
+                font-weight: 500;
                 color: {COLORS['text_secondary']};
                 padding: 40px;
             """)
@@ -321,7 +334,8 @@ class AIInsightsScreen(QWidget):
         
         error_label = QLabel("Failed to load AI insights")
         error_label.setStyleSheet(f"""
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: 600;
             color: {COLORS['error']};
             padding: 40px;
         """)

@@ -23,6 +23,21 @@ from PyQt6.QtCore import Qt
 
 from config import get_stylesheet, WINDOW_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT, MOCK_MODE
 from main_window import MainWindow
+from setup_flow import SetupFlowWindow
+
+
+def is_first_time_setup() -> bool:
+    """Check if this is the first time the device is being set up"""
+    setup_file = parent_dir / "pyqt6_ui" / ".setup_complete"
+    return not setup_file.exists()
+
+
+def mark_setup_complete():
+    """Mark setup as complete"""
+    setup_file = parent_dir / "pyqt6_ui" / ".setup_complete"
+    # Ensure parent directory exists
+    setup_file.parent.mkdir(parents=True, exist_ok=True)
+    setup_file.touch()
 
 
 def main():
@@ -36,12 +51,11 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName(WINDOW_TITLE)
     
+    # Enable touch events globally
+    app.setAttribute(Qt.ApplicationAttribute.AA_SynthesizeTouchForUnhandledMouseEvents, True)
+    
     # Apply stylesheet
     app.setStyleSheet(get_stylesheet())
-    
-    # Create and show main window
-    window = MainWindow()
-    window.show()
     
     # Print startup info
     mode = "DEMO MODE (Mock Data)" if MOCK_MODE else "Production Mode"
@@ -58,8 +72,29 @@ Backend: Flask REST API
 Ready! Access the touchscreen interface.
     """)
     
-    # Run application
+    # Check if first-time setup is needed
+    if is_first_time_setup():
+        # Show setup flow
+        window = SetupFlowWindow()
+        window.setup_complete.connect(lambda: (
+            mark_setup_complete(),
+            window.close(),
+            show_main_window()
+        ))
+    else:
+        # Show main window directly
+        window = MainWindow()
+    
+    window.show()
+    
+    # Run application event loop
     sys.exit(app.exec())
+
+
+def show_main_window():
+    """Show the main application window after setup"""
+    window = MainWindow()
+    window.show()
 
 
 if __name__ == '__main__':

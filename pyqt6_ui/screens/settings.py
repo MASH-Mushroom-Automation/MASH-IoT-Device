@@ -12,6 +12,7 @@ from PyQt6.QtGui import QPixmap, QIcon
 
 from config import COLORS, ICONS_DIR, ICONS, MOCK_MODE
 from api_client import APIClient
+from icon_utils import create_icon
 
 
 class SettingSection(QFrame):
@@ -26,14 +27,14 @@ class SettingSection(QFrame):
         self.setProperty("class", "card")
         
         self.layout = QVBoxLayout()
-        self.layout.setContentsMargins(20, 20, 20, 20)
-        self.layout.setSpacing(16)
+        self.layout.setContentsMargins(14, 14, 14, 14)
+        self.layout.setSpacing(12)
         
         # Section title
         title_label = QLabel(title)
         title_label.setStyleSheet(f"""
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: {COLORS['text_primary']};
         """)
         self.layout.addWidget(title_label)
@@ -46,8 +47,10 @@ class SettingSection(QFrame):
         item_layout.setSpacing(12)
         
         label_widget = QLabel(label)
+        label_widget.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         label_widget.setStyleSheet(f"""
-            font-size: 14px;
+            font-size: 15px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         item_layout.addWidget(label_widget)
@@ -55,9 +58,10 @@ class SettingSection(QFrame):
         item_layout.addStretch()
         
         value_widget = QLabel(value)
+        value_widget.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         value_widget.setStyleSheet(f"""
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 15px;
+            font-weight: 600;
             color: {COLORS['text_primary']};
         """)
         item_layout.addWidget(value_widget)
@@ -76,15 +80,15 @@ class SettingsScreen(QWidget):
     def setup_ui(self):
         """Setup settings UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(14)
         
         # Header
         header = QHBoxLayout()
         
         title = QLabel("Settings")
         title.setStyleSheet(f"""
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: {COLORS['text_primary']};
         """)
@@ -97,6 +101,12 @@ class SettingsScreen(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Enable kinetic scrolling for touch
+        scroll.setProperty("kineticScrollingEnabled", True)
+        scroll.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
         
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout()
@@ -156,8 +166,8 @@ class SettingsScreen(QWidget):
         
         actions_title = QLabel("Actions")
         actions_title.setStyleSheet(f"""
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: {COLORS['text_primary']};
         """)
         actions_layout.addWidget(actions_title)
@@ -166,7 +176,7 @@ class SettingsScreen(QWidget):
         export_btn = QPushButton()
         icon_path = ICONS_DIR / ICONS['download']
         if icon_path.exists():
-            export_btn.setIcon(QIcon(str(icon_path)))
+            export_btn.setIcon(create_icon(icon_path, 20, COLORS['text_primary']))
             export_btn.setIconSize(QSize(20, 20))
         export_btn.setText("Export Sensor Data")
         export_btn.clicked.connect(self.export_data)
@@ -176,7 +186,7 @@ class SettingsScreen(QWidget):
         refresh_btn = QPushButton()
         icon_path = ICONS_DIR / ICONS['refresh']
         if icon_path.exists():
-            refresh_btn.setIcon(QIcon(str(icon_path)))
+            refresh_btn.setIcon(create_icon(icon_path, 20, COLORS['text_primary']))
             refresh_btn.setIconSize(QSize(20, 20))
         refresh_btn.setText("Refresh Configuration")
         refresh_btn.clicked.connect(self.refresh)

@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 
 from config import COLORS, ICONS_DIR, ICONS, SCREEN_WIDTH, SCREEN_HEIGHT
+from icon_utils import load_svg_icon
 from screens.dashboard import DashboardScreen
 from screens.controls import ControlsScreen
 from screens.alerts import AlertsScreen
@@ -35,26 +36,22 @@ class NavigationButton(QPushButton):
         icon_path = ICONS_DIR / icon_name
         if icon_path.exists():
             icon_label = QLabel()
-            pixmap = QPixmap(str(icon_path))
-            icon_label.setPixmap(pixmap.scaled(
-                24, 24, 
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            pixmap = load_svg_icon(icon_path, 24, COLORS['text_primary'])
+            icon_label.setPixmap(pixmap)
             layout.addWidget(icon_label)
         
         # Label
         text_label = QLabel(label)
         text_label.setStyleSheet(f"""
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 16px;
+            font-weight: 600;
             color: {COLORS['text_primary']};
         """)
         layout.addWidget(text_label)
         layout.addStretch()
         
         self.setLayout(layout)
-        self.setMinimumHeight(56)
+        self.setMinimumHeight(60)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
 
@@ -67,7 +64,7 @@ class NavigationSidebar(QFrame):
     
     def setup_ui(self):
         """Setup sidebar UI"""
-        self.setFixedWidth(220)
+        self.setFixedWidth(180)
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['surface']};
@@ -76,13 +73,13 @@ class NavigationSidebar(QFrame):
         """)
         
         layout = QVBoxLayout()
-        layout.setContentsMargins(16, 20, 16, 20)
-        layout.setSpacing(8)
+        layout.setContentsMargins(12, 16, 12, 16)
+        layout.setSpacing(6)
         
         # Logo/Title
         title = QLabel("MASH IoT")
         title.setStyleSheet(f"""
-            font-size: 20px;
+            font-size: 24px;
             font-weight: bold;
             color: {COLORS['primary']};
             padding: 12px 0;
@@ -123,14 +120,15 @@ class NavigationSidebar(QFrame):
         
         self.status_label = QLabel("System Online")
         self.status_label.setStyleSheet(f"""
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
             color: {COLORS['success']};
         """)
         
         self.uptime_label = QLabel("Uptime: --")
         self.uptime_label.setStyleSheet(f"""
-            font-size: 10px;
+            font-size: 11px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         
@@ -154,7 +152,9 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """Setup main window UI"""
         self.setWindowTitle("MASH IoT Device")
-        self.setFixedSize(SCREEN_WIDTH, SCREEN_HEIGHT)
+        # Enable resizing and set minimum/default size for 7" touchscreen
+        self.setMinimumSize(800, 480)
+        self.resize(SCREEN_WIDTH, SCREEN_HEIGHT)
         
         # Central widget
         central_widget = QWidget()
@@ -199,14 +199,17 @@ class MainWindow(QMainWindow):
     def setup_connections(self):
         """Connect navigation buttons to screens"""
         for key, button in self.sidebar.nav_buttons.items():
-            button.clicked.connect(lambda checked, k=key: self.show_screen(k))
+            # Map 'home' button to 'dashboard' screen
+            screen_key = 'dashboard' if key == 'home' else key
+            button.clicked.connect(lambda checked, k=screen_key: self.show_screen(k))
     
     def show_screen(self, screen_name: str):
         """Switch to specified screen"""
         if screen_name in self.screens:
-            # Update navigation buttons
+            # Update navigation buttons - map dashboard back to home button
+            button_key = 'home' if screen_name == 'dashboard' else screen_name
             for key, button in self.sidebar.nav_buttons.items():
-                button.setChecked(key == screen_name)
+                button.setChecked(key == button_key)
             
             # Show screen
             self.content_stack.setCurrentWidget(self.screens[screen_name])

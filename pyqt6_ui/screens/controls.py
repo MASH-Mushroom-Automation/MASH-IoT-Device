@@ -12,6 +12,7 @@ from PyQt6.QtGui import QPixmap, QIcon
 
 from config import COLORS, ICONS_DIR, ICONS, SENSOR_UPDATE_INTERVAL
 from api_client import APIClient
+from icon_utils import load_svg_icon
 
 
 class ActuatorControl(QFrame):
@@ -28,11 +29,11 @@ class ActuatorControl(QFrame):
     def setup_ui(self):
         """Setup control UI"""
         self.setProperty("class", "card")
-        self.setMinimumHeight(140)
+        self.setMinimumHeight(150)
         
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(12)
         
         # Header with icon and name
         header = QHBoxLayout()
@@ -42,18 +43,15 @@ class ActuatorControl(QFrame):
         icon_path = ICONS_DIR / self.icon_name
         if icon_path.exists():
             icon_label = QLabel()
-            pixmap = QPixmap(str(icon_path))
-            icon_label.setPixmap(pixmap.scaled(
-                40, 40,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            pixmap = load_svg_icon(icon_path, 40, COLORS['primary'])
+            icon_label.setPixmap(pixmap)
             header.addWidget(icon_label)
         
-        # Name
+        # Make all labels non-selectable
         name_label = QLabel(self.display_name)
+        name_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         name_label.setStyleSheet(f"""
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 600;
             color: {COLORS['text_primary']};
         """)
@@ -64,10 +62,11 @@ class ActuatorControl(QFrame):
         
         # Status
         self.status_label = QLabel("OFF")
+        self.status_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.status_label.setStyleSheet(f"""
-            font-size: 14px;
+            font-size: 16px;
             color: {COLORS['text_disabled']};
-            font-weight: 500;
+            font-weight: 600;
         """)
         layout.addWidget(self.status_label)
         
@@ -77,8 +76,10 @@ class ActuatorControl(QFrame):
         toggle_layout = QHBoxLayout()
         
         toggle_label = QLabel("Power:")
+        toggle_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         toggle_label.setStyleSheet(f"""
-            font-size: 13px;
+            font-size: 15px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         toggle_layout.addWidget(toggle_label)
@@ -87,9 +88,9 @@ class ActuatorControl(QFrame):
         self.toggle = QCheckBox()
         self.toggle.setStyleSheet(f"""
             QCheckBox::indicator {{
-                width: 56px;
-                height: 28px;
-                border-radius: 14px;
+                width: 64px;
+                height: 32px;
+                border-radius: 16px;
             }}
             QCheckBox::indicator:unchecked {{
                 background-color: {COLORS['surface_light']};
@@ -117,16 +118,16 @@ class ActuatorControl(QFrame):
         if self.state:
             self.status_label.setText("ON")
             self.status_label.setStyleSheet(f"""
-                font-size: 14px;
+                font-size: 16px;
                 color: {COLORS['success']};
                 font-weight: 600;
             """)
         else:
             self.status_label.setText("OFF")
             self.status_label.setStyleSheet(f"""
-                font-size: 14px;
+                font-size: 16px;
                 color: {COLORS['text_disabled']};
-                font-weight: 500;
+                font-weight: 600;
             """)
     
     def set_state(self, state: bool, block_signals: bool = True):
@@ -153,15 +154,15 @@ class ControlsScreen(QWidget):
     def setup_ui(self):
         """Setup controls UI"""
         layout = QVBoxLayout()
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(24)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(16)
         
         # Header
         header = QHBoxLayout()
         
         title = QLabel("Manual Controls")
         title.setStyleSheet(f"""
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: {COLORS['text_primary']};
         """)
@@ -172,8 +173,8 @@ class ControlsScreen(QWidget):
         self.auto_checkbox = QCheckBox("Automation Enabled")
         self.auto_checkbox.setStyleSheet(f"""
             QCheckBox {{
-                font-size: 14px;
-                font-weight: 500;
+                font-size: 16px;
+                font-weight: 600;
                 color: {COLORS['text_primary']};
                 spacing: 8px;
             }}
@@ -214,17 +215,15 @@ class ControlsScreen(QWidget):
         info_icon_path = ICONS_DIR / ICONS['info']
         if info_icon_path.exists():
             info_icon = QLabel()
-            pixmap = QPixmap(str(info_icon_path))
-            info_icon.setPixmap(pixmap.scaled(
-                20, 20,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            pixmap = load_svg_icon(info_icon_path, 20, COLORS['info'])
+            info_icon.setPixmap(pixmap)
             banner_layout.addWidget(info_icon)
         
         self.info_label = QLabel("Automation is active. System is managing actuators automatically.")
+        self.info_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.info_label.setStyleSheet(f"""
-            font-size: 13px;
+            font-size: 14px;
+            font-weight: 500;
             color: {COLORS['text_secondary']};
         """)
         self.info_label.setWordWrap(True)

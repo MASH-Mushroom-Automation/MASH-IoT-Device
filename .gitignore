@@ -1,3 +1,4 @@
+.env
 *.pyc
 /touchscreen_ui/venv
 /venv

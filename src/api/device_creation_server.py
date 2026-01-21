@@ -11,6 +11,10 @@ import requests
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add parent directory to path to import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -34,7 +38,33 @@ CORS(app)
 BACKEND_URL = os.getenv('BACKEND_URL', 'https://mash-backend-production.up.railway.app')
 BACKEND_API_URL = f"{BACKEND_URL}/api/v1"
 
+# JWT Configuration
+JWT_SECRET = os.getenv('JWT_SECRET', 'your-super-secret-jwt-key-change-this-in-production')
+JWT_EXPIRATION = os.getenv('JWT_EXPIRATION', '1d')
+
+# Optional: API Key for backend authentication
+API_KEY = os.getenv('BACKEND_API_KEY', '')
+
 logger.info(f"Backend API URL: {BACKEND_API_URL}")
+logger.info(f"JWT Secret configured: {'Yes' if JWT_SECRET else 'No'}")
+
+
+def get_auth_headers():
+    """Get authentication headers for backend requests"""
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    
+    # Add API key if configured
+    if API_KEY:
+        headers['X-API-Key'] = API_KEY
+    
+    # Add JWT token if available from request
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        headers['Authorization'] = auth_header
+    
+    return headers
 
 
 @app.route('/')
@@ -131,6 +161,7 @@ def list_devices():
         response = requests.get(
             f"{BACKEND_API_URL}/devices",
             params=params,
+            headers=get_auth_headers(),
             timeout=10
         )
         
@@ -204,6 +235,7 @@ def create_device():
         response = requests.post(
             f"{BACKEND_API_URL}/devices",
             json=data,
+            headers=get_auth_headers(),
             timeout=10
         )
         
